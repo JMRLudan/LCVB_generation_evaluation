@@ -1,0 +1,1003 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-04-21T00:34:40.337519+00:00",
+  "source_files": [
+    "data/distractor_turns.json",
+    "data/stitched_full_length_scenarios_top_first.csv"
+  ],
+  "total_unique_groups": 99,
+  "total_source_groups": 475,
+  "dedup_ratio": 0.208421,
+  "groups": [
+    {
+      "distractor_hash": "014335d0db9f",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 665,
+      "num_user_turns": 333,
+      "referencing_scenarios": [
+        "AQ-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "033660cca62f",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 774,
+      "num_user_turns": 387,
+      "referencing_scenarios": [
+        "DV-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "12a64e3fb0f6",
+      "distractor_domain": "Mathematics",
+      "num_turns": 656,
+      "num_user_turns": 330,
+      "referencing_scenarios": [
+        "HF-05"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "12b8eff3a2de",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 494,
+      "num_user_turns": 247,
+      "referencing_scenarios": [
+        "GP-05"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "157859496ad6",
+      "distractor_domain": "Career/Productivity",
+      "num_turns": 487,
+      "num_user_turns": 244,
+      "referencing_scenarios": [
+        "EA-05"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "1745eca4fc94",
+      "distractor_domain": "History/Politics",
+      "num_turns": 364,
+      "num_user_turns": 182,
+      "referencing_scenarios": [
+        "EL-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "1ae886f8ec60",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 450,
+      "num_user_turns": 225,
+      "referencing_scenarios": [
+        "DI-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "1e1921c3db3d",
+      "distractor_domain": "Science/Space",
+      "num_turns": 492,
+      "num_user_turns": 246,
+      "referencing_scenarios": [
+        "TD-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "1e282b9b820e",
+      "distractor_domain": "Language Learning",
+      "num_turns": 444,
+      "num_user_turns": 222,
+      "referencing_scenarios": [
+        "CD-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "1e3b23af8569",
+      "distractor_domain": "Sports Analysis",
+      "num_turns": 290,
+      "num_user_turns": 145,
+      "referencing_scenarios": [
+        "TS-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "1f70bcb5d3d1",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 640,
+      "num_user_turns": 321,
+      "referencing_scenarios": [
+        "EA-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "22dcb145f9e7",
+      "distractor_domain": "History/Politics",
+      "num_turns": 334,
+      "num_user_turns": 167,
+      "referencing_scenarios": [
+        "FP-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "2d03879aeb75",
+      "distractor_domain": "History/Politics",
+      "num_turns": 368,
+      "num_user_turns": 184,
+      "referencing_scenarios": [
+        "PB-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "333e72b77a7e",
+      "distractor_domain": "Mathematics",
+      "num_turns": 777,
+      "num_user_turns": 390,
+      "referencing_scenarios": [
+        "SE-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "385f41abe989",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 510,
+      "num_user_turns": 255,
+      "referencing_scenarios": [
+        "AR-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "397d6a9e2f9c",
+      "distractor_domain": "Cooking Technique",
+      "num_turns": 457,
+      "num_user_turns": 229,
+      "referencing_scenarios": [
+        "EA-06"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "3aea336ea350",
+      "distractor_domain": "Writing/Rhetoric",
+      "num_turns": 318,
+      "num_user_turns": 159,
+      "referencing_scenarios": [
+        "DN-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "3b4761800fa8",
+      "distractor_domain": "Philosophy/Logic",
+      "num_turns": 786,
+      "num_user_turns": 393,
+      "referencing_scenarios": [
+        "HS-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "3be9d2a391a3",
+      "distractor_domain": "Mechanical/Electronics",
+      "num_turns": 386,
+      "num_user_turns": 192,
+      "referencing_scenarios": [
+        "SW-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "46ac751ffa86",
+      "distractor_domain": "History/Politics",
+      "num_turns": 357,
+      "num_user_turns": 179,
+      "referencing_scenarios": [
+        "GP-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "4a57d07ce53f",
+      "distractor_domain": "Visual Arts/Design",
+      "num_turns": 386,
+      "num_user_turns": 193,
+      "referencing_scenarios": [
+        "MC-05"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "4a695963058c",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 482,
+      "num_user_turns": 241,
+      "referencing_scenarios": [
+        "PS-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "4c261d7d8a9d",
+      "distractor_domain": "Mechanical/Electronics",
+      "num_turns": 562,
+      "num_user_turns": 281,
+      "referencing_scenarios": [
+        "IM-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "4d111b607425",
+      "distractor_domain": "Sports Analysis",
+      "num_turns": 469,
+      "num_user_turns": 234,
+      "referencing_scenarios": [
+        "CS-06"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "4fb4e2a1db10",
+      "distractor_domain": "Science/Space",
+      "num_turns": 475,
+      "num_user_turns": 238,
+      "referencing_scenarios": [
+        "PY-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "4ff4f55632cd",
+      "distractor_domain": "History/Politics",
+      "num_turns": 328,
+      "num_user_turns": 164,
+      "referencing_scenarios": [
+        "SZ-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "52c3e23c7f6f",
+      "distractor_domain": "Mathematics",
+      "num_turns": 694,
+      "num_user_turns": 347,
+      "referencing_scenarios": [
+        "DM-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "53e7eaf2f310",
+      "distractor_domain": "Language Learning",
+      "num_turns": 460,
+      "num_user_turns": 230,
+      "referencing_scenarios": [
+        "AG-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "54ff80cca526",
+      "distractor_domain": "Career/Productivity",
+      "num_turns": 572,
+      "num_user_turns": 286,
+      "referencing_scenarios": [
+        "MC-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "5608d869602a",
+      "distractor_domain": "Mathematics",
+      "num_turns": 738,
+      "num_user_turns": 370,
+      "referencing_scenarios": [
+        "SG-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "5840d84b0cf4",
+      "distractor_domain": "Science/Space",
+      "num_turns": 528,
+      "num_user_turns": 264,
+      "referencing_scenarios": [
+        "EA-07"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "5d8c446fbd48",
+      "distractor_domain": "Visual Arts/Design",
+      "num_turns": 398,
+      "num_user_turns": 199,
+      "referencing_scenarios": [
+        "DV-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "619ca944fad1",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 610,
+      "num_user_turns": 305,
+      "referencing_scenarios": [
+        "MC-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "65d03a082a80",
+      "distractor_domain": "Science/Space",
+      "num_turns": 434,
+      "num_user_turns": 217,
+      "referencing_scenarios": [
+        "CT-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "68f128a06408",
+      "distractor_domain": "Sports Analysis",
+      "num_turns": 442,
+      "num_user_turns": 221,
+      "referencing_scenarios": [
+        "MC-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "6a023caa7072",
+      "distractor_domain": "Economics/Business",
+      "num_turns": 496,
+      "num_user_turns": 248,
+      "referencing_scenarios": [
+        "MC-06"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "6ac81ac11bc7",
+      "distractor_domain": "Philosophy/Logic",
+      "num_turns": 699,
+      "num_user_turns": 350,
+      "referencing_scenarios": [
+        "HS-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "730ad295b2ef",
+      "distractor_domain": "Economics/Business",
+      "num_turns": 644,
+      "num_user_turns": 323,
+      "referencing_scenarios": [
+        "CC-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "748a71ade98f",
+      "distractor_domain": "Writing/Rhetoric",
+      "num_turns": 480,
+      "num_user_turns": 240,
+      "referencing_scenarios": [
+        "EM-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "76ba3b0328d9",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 579,
+      "num_user_turns": 290,
+      "referencing_scenarios": [
+        "SG-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "7777a4f1f9b9",
+      "distractor_domain": "Mechanical/Electronics",
+      "num_turns": 266,
+      "num_user_turns": 133,
+      "referencing_scenarios": [
+        "CS-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "79d687d59a46",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 587,
+      "num_user_turns": 300,
+      "referencing_scenarios": [
+        "HF-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "7c28b7bf194e",
+      "distractor_domain": "Mathematics",
+      "num_turns": 694,
+      "num_user_turns": 347,
+      "referencing_scenarios": [
+        "PS-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "80bba4688a70",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 506,
+      "num_user_turns": 253,
+      "referencing_scenarios": [
+        "IM-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "8326a4ef3470",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 445,
+      "num_user_turns": 223,
+      "referencing_scenarios": [
+        "AQ-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "876c43049873",
+      "distractor_domain": "Music/Audio",
+      "num_turns": 444,
+      "num_user_turns": 222,
+      "referencing_scenarios": [
+        "DI-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "893be31b2fcf",
+      "distractor_domain": "Cooking Technique",
+      "num_turns": 526,
+      "num_user_turns": 263,
+      "referencing_scenarios": [
+        "MC-07"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "8ab87b218ba4",
+      "distractor_domain": "Language Learning",
+      "num_turns": 380,
+      "num_user_turns": 190,
+      "referencing_scenarios": [
+        "AV-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "8bc2f454278a",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 560,
+      "num_user_turns": 280,
+      "referencing_scenarios": [
+        "CS-05"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "8e57e59ce050",
+      "distractor_domain": "Film/Television",
+      "num_turns": 363,
+      "num_user_turns": 182,
+      "referencing_scenarios": [
+        "PS-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "9115f6966521",
+      "distractor_domain": "Writing/Rhetoric",
+      "num_turns": 514,
+      "num_user_turns": 257,
+      "referencing_scenarios": [
+        "CS-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "9bb823e84608",
+      "distractor_domain": "Gaming/Puzzles",
+      "num_turns": 317,
+      "num_user_turns": 159,
+      "referencing_scenarios": [
+        "EY-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "9c51600a71b7",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 472,
+      "num_user_turns": 236,
+      "referencing_scenarios": [
+        "FS-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "a20a5bcbcd22",
+      "distractor_domain": "Gaming/Puzzles",
+      "num_turns": 418,
+      "num_user_turns": 209,
+      "referencing_scenarios": [
+        "HF-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "a2c150c7771b",
+      "distractor_domain": "Cooking Technique",
+      "num_turns": 420,
+      "num_user_turns": 210,
+      "referencing_scenarios": [
+        "MC-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "a32c72029616",
+      "distractor_domain": "Mechanical/Electronics",
+      "num_turns": 260,
+      "num_user_turns": 130,
+      "referencing_scenarios": [
+        "HF-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "ab2772f6c4c0",
+      "distractor_domain": "Film/Television",
+      "num_turns": 447,
+      "num_user_turns": 224,
+      "referencing_scenarios": [
+        "DI-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "ad42a863326b",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 572,
+      "num_user_turns": 286,
+      "referencing_scenarios": [
+        "DM-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "ad6307e437c9",
+      "distractor_domain": "Cooking Technique",
+      "num_turns": 485,
+      "num_user_turns": 243,
+      "referencing_scenarios": [
+        "PS-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "b2652b2a5279",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 450,
+      "num_user_turns": 225,
+      "referencing_scenarios": [
+        "PY-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "b2caf0dbb0b8",
+      "distractor_domain": "Film/Television",
+      "num_turns": 446,
+      "num_user_turns": 223,
+      "referencing_scenarios": [
+        "DV-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "b54a6acb5f8c",
+      "distractor_domain": "History/Politics",
+      "num_turns": 400,
+      "num_user_turns": 200,
+      "referencing_scenarios": [
+        "IM-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "badf4c9b54d8",
+      "distractor_domain": "Music/Audio",
+      "num_turns": 375,
+      "num_user_turns": 188,
+      "referencing_scenarios": [
+        "RD-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "be676678e149",
+      "distractor_domain": "Visual Arts/Design",
+      "num_turns": 507,
+      "num_user_turns": 254,
+      "referencing_scenarios": [
+        "DI-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "c06315a35d11",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 406,
+      "num_user_turns": 204,
+      "referencing_scenarios": [
+        "SW-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "c0b8203cb7ed",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 566,
+      "num_user_turns": 284,
+      "referencing_scenarios": [
+        "HF-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "c0fcfa83a994",
+      "distractor_domain": "Philosophy/Logic",
+      "num_turns": 541,
+      "num_user_turns": 272,
+      "referencing_scenarios": [
+        "AG-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "c3483ba5b248",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 443,
+      "num_user_turns": 231,
+      "referencing_scenarios": [
+        "DI-05"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "c6cf2f9bd713",
+      "distractor_domain": "Sports Analysis",
+      "num_turns": 338,
+      "num_user_turns": 170,
+      "referencing_scenarios": [
+        "EL-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "c9ef80b596f6",
+      "distractor_domain": "Mathematics",
+      "num_turns": 534,
+      "num_user_turns": 267,
+      "referencing_scenarios": [
+        "AV-03"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "d6fa6e3a7feb",
+      "distractor_domain": "Mechanical/Electronics",
+      "num_turns": 426,
+      "num_user_turns": 214,
+      "referencing_scenarios": [
+        "KD-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "d9c5d67dc7dd",
+      "distractor_domain": "Gaming/Puzzles",
+      "num_turns": 306,
+      "num_user_turns": 154,
+      "referencing_scenarios": [
+        "EA-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "dad344379415",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 396,
+      "num_user_turns": 199,
+      "referencing_scenarios": [
+        "DI-06"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "dbca68c11c84",
+      "distractor_domain": "Visual Arts/Design",
+      "num_turns": 468,
+      "num_user_turns": 234,
+      "referencing_scenarios": [
+        "GP-06"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "dd1b7c2b617a",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 442,
+      "num_user_turns": 221,
+      "referencing_scenarios": [
+        "DI-07"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "e21a2344c0af",
+      "distractor_domain": "Visual Arts/Design",
+      "num_turns": 419,
+      "num_user_turns": 210,
+      "referencing_scenarios": [
+        "GP-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "e5d4f093c774",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 652,
+      "num_user_turns": 326,
+      "referencing_scenarios": [
+        "CS-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "e715773ce0f7",
+      "distractor_domain": "Language Learning",
+      "num_turns": 514,
+      "num_user_turns": 257,
+      "referencing_scenarios": [
+        "IF-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "e970639b884b",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 440,
+      "num_user_turns": 220,
+      "referencing_scenarios": [
+        "EM-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "ea7b153218a7",
+      "distractor_domain": "Cooking Technique",
+      "num_turns": 472,
+      "num_user_turns": 237,
+      "referencing_scenarios": [
+        "CS-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "ec80cf6c671b",
+      "distractor_domain": "Geography/Maps",
+      "num_turns": 720,
+      "num_user_turns": 361,
+      "referencing_scenarios": [
+        "PS-05"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "eda7d66a6835",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 541,
+      "num_user_turns": 271,
+      "referencing_scenarios": [
+        "CH-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "eff4cbaafdfc",
+      "distractor_domain": "Programming/CS",
+      "num_turns": 471,
+      "num_user_turns": 236,
+      "referencing_scenarios": [
+        "GP-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "f0527b5c1ef6",
+      "distractor_domain": "Sports Analysis",
+      "num_turns": 500,
+      "num_user_turns": 250,
+      "referencing_scenarios": [
+        "AV-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "f1fa11a68141",
+      "distractor_domain": "Literary Analysis",
+      "num_turns": 550,
+      "num_user_turns": 275,
+      "referencing_scenarios": [
+        "FP-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "f22004db9a19",
+      "distractor_domain": "Science/Space",
+      "num_turns": 592,
+      "num_user_turns": 296,
+      "referencing_scenarios": [
+        "MD-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "f570f88f4fbd",
+      "distractor_domain": "Philosophy/Logic",
+      "num_turns": 506,
+      "num_user_turns": 253,
+      "referencing_scenarios": [
+        "KD-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "f660f42085b8",
+      "distractor_domain": "Visual Arts/Design",
+      "num_turns": 556,
+      "num_user_turns": 278,
+      "referencing_scenarios": [
+        "TS-02"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "f8884fdac576",
+      "distractor_domain": "Music/Audio",
+      "num_turns": 310,
+      "num_user_turns": 155,
+      "referencing_scenarios": [
+        "ES-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "fa13ef90df78",
+      "distractor_domain": "Career/Productivity",
+      "num_turns": 380,
+      "num_user_turns": 190,
+      "referencing_scenarios": [
+        "HS-04"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "fe7085c83e9d",
+      "distractor_domain": "Mathematics",
+      "num_turns": 394,
+      "num_user_turns": 198,
+      "referencing_scenarios": [
+        "SE-01"
+      ],
+      "num_references": 5
+    },
+    {
+      "distractor_hash": "50cbbb39273a",
+      "distractor_domain": "Language Learning",
+      "num_turns": 560,
+      "num_user_turns": 280,
+      "referencing_scenarios": [
+        "CT-02"
+      ],
+      "num_references": 4
+    },
+    {
+      "distractor_hash": "5342b029447f",
+      "distractor_domain": "Music/Audio",
+      "num_turns": 319,
+      "num_user_turns": 160,
+      "referencing_scenarios": [
+        "HS-03"
+      ],
+      "num_references": 4
+    },
+    {
+      "distractor_hash": "b4e7a0fb354e",
+      "distractor_domain": "Music/Audio",
+      "num_turns": 361,
+      "num_user_turns": 181,
+      "referencing_scenarios": [
+        "CD-01"
+      ],
+      "num_references": 4
+    },
+    {
+      "distractor_hash": "f36579d3ce52",
+      "distractor_domain": "Philosophy/Logic",
+      "num_turns": 576,
+      "num_user_turns": 288,
+      "referencing_scenarios": [
+        "PY-01"
+      ],
+      "num_references": 4
+    },
+    {
+      "distractor_hash": "332627944e32",
+      "distractor_domain": "Philosophy/Logic",
+      "num_turns": 588,
+      "num_user_turns": 294,
+      "referencing_scenarios": [
+        "PY-01"
+      ],
+      "num_references": 1
+    },
+    {
+      "distractor_hash": "a279c1232fff",
+      "distractor_domain": "Music/Audio",
+      "num_turns": 373,
+      "num_user_turns": 187,
+      "referencing_scenarios": [
+        "CD-01"
+      ],
+      "num_references": 1
+    },
+    {
+      "distractor_hash": "c159cbddf7f9",
+      "distractor_domain": "Music/Audio",
+      "num_turns": 331,
+      "num_user_turns": 166,
+      "referencing_scenarios": [
+        "HS-03"
+      ],
+      "num_references": 1
+    },
+    {
+      "distractor_hash": "c822d2a17b5d",
+      "distractor_domain": "Language Learning",
+      "num_turns": 572,
+      "num_user_turns": 286,
+      "referencing_scenarios": [
+        "CT-02"
+      ],
+      "num_references": 1
+    }
+  ]
+}
