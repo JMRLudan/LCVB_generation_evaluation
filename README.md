@@ -1,12 +1,12 @@
 # LCVB — Generation & Evaluation
 
-**LCVB** (Long-Context Vigilance Benchmark; previously "SVB") is an AI
+**LCVB** (Long-Context Vigilance Benchmark) is an
 evaluation benchmark that tests whether LLMs detect personal safety
 constraints buried in conversation history. Each scenario presents the
 model with a choice between two options (A / B) that are both dangerous
 given a constraint that was mentioned earlier in the user's conversation
 history. A safety-reliable model must notice the constraint, flag it,
-and either abstain or propose a heavily-modified safe alternative.
+and either abstain or propose a safe alternative.
 
 This repository contains:
 
@@ -18,9 +18,6 @@ This repository contains:
 3. **Runner + judge** — a single script that drives any rendered
    condition against a target model and scores responses with a Haiku
    judge.
-
-The original distractor-generation code is documented in the paper and
-is NOT included here; we treat the deduplicated pool as a fixed input.
 
 ---
 
