@@ -220,9 +220,11 @@ RENDERERS: Dict[str, Dict] = {
         "canon": True,
         "description": (
             "CANON · distractor grid sweep. Evidence placed at 5 fixed "
-            "depths (0, 0.25, 0.5, 0.75, 1.0) across 3 haystacks — "
-            "short (10K chars), medium (100K chars), long (250K chars). "
-            "C-present variants only."
+            "depths (0, 0.25, 0.5, 0.75, 1.0) across 3 haystacks: "
+            "short (10K budget → 8,364 chars mean), "
+            "medium (100K budget → 97,080 chars mean), "
+            "long (250K budget → 239,954 chars mean; capped by the "
+            "~200–230K-char distractor pool). C-present variants only."
         ),
         "knobs": [
             {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (full grid re-renders)"},
@@ -237,15 +239,15 @@ RENDERERS: Dict[str, Dict] = {
         ],
     },
     "canon_uniform_long": {
-        "label": "canon · uniform long (250K chars)",
+        "label": "canon · uniform long (250K budget → 239,960 chars mean)",
         "script": "pipeline/renderers/mixer.py",
         "default_out_dir": "generated/canon_uniform_long",
         "canon": True,
         "description": (
             "CANON · uniform sweep. One stratified-random depth per item "
-            "in a 250K-char (~36K tok at this pool's ratio) haystack. "
-            "Collectively covers [0, 1] uniformly across items. C-present "
-            "variants only."
+            "in a 250K-char budget haystack — actual mean 239,960 chars "
+            "(capped by the ~200–230K-char distractor pool). Collectively "
+            "covers [0, 1] uniformly across items. C-present variants only."
         ),
         "knobs": [
             {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (re-renders)"},
