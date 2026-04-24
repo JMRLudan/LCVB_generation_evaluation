@@ -323,6 +323,7 @@ const state = {
   genCondition: null,
   pollTimer: null,
   jobPollTimers: new Map(),
+  lastCondCounts: {},  // condition name → file_count, for auto-scan diff
 };
 
 // ── Utils
@@ -357,7 +358,39 @@ async function loadConditions() {
       h("span", { class: "badge" }, String(c.file_count)),
     ]);
     li.dataset.cond = c.name;
+    if (c.name === state.currentCondition) li.classList.add("selected");
     ul.appendChild(li);
+    state.lastCondCounts[c.name] = c.file_count;
+  }
+}
+
+// Periodic poll: if any condition's file_count changed, refresh. Surfaces
+// files created by other processes (CLI runs, second terminal, etc.).
+async function autoScan() {
+  try {
+    const r = await fetch("/api/conditions");
+    if (!r.ok) return;
+    const conds = await r.json();
+    let changedCurrent = false;
+    let anyChanged = false;
+    for (const c of conds) {
+      if (state.lastCondCounts[c.name] !== c.file_count) {
+        anyChanged = true;
+        if (c.name === state.currentCondition) changedCurrent = true;
+      }
+    }
+    if (anyChanged) {
+      state.conditions = conds;
+      // Update just the badge counts in-place to avoid losing scroll/selection
+      for (const c of conds) {
+        const li = document.querySelector(`#cond-list li[data-cond="${c.name}"]`);
+        if (li) li.querySelector(".badge").textContent = String(c.file_count);
+        state.lastCondCounts[c.name] = c.file_count;
+      }
+      if (changedCurrent) refreshPromptList();
+    }
+  } catch (e) {
+    // Network blips are fine — just skip this tick
   }
 }
 
@@ -530,19 +563,28 @@ function populateKnobs() {
     if (k.type === "bool") {
       wrap.className = "knob checkbox";
       wrap.innerHTML = `<input type="checkbox" id="${id}" ${k.default ? "checked" : ""}><label for="${id}">${k.label}</label>`;
-    } else if (k.type === "list_float") {
+    } else if (k.type === "list_float" || k.type === "list_int" || k.type === "str") {
       wrap.className = "knob";
-      wrap.innerHTML = `<label>${k.label}</label><input type="text" id="${id}" value="${k.default}">`;
+      wrap.innerHTML = `<label>${k.label}</label><input type="text" id="${id}" value="${k.default ?? ""}">`;
     } else if (k.type === "multi_choice") {
       wrap.className = "knob";
       wrap.innerHTML = `<label>${k.label}</label><input type="text" id="${id}" value="${(k.default || []).join(",")}">`;
+    } else if (k.type === "choice") {
+      wrap.className = "knob";
+      const opts = (k.choices || []).map(c =>
+        `<option value="${c}" ${c === k.default ? "selected" : ""}>${c}</option>`
+      ).join("");
+      wrap.innerHTML = `<label>${k.label}</label><select id="${id}">${opts}</select>`;
     } else {
       wrap.className = "knob";
       wrap.innerHTML = `<label>${k.label}</label><input type="number" id="${id}" value="${k.default}" ${k.min != null ? `min="${k.min}"` : ""} ${k.max != null ? `max="${k.max}"` : ""}>`;
     }
     box.appendChild(wrap);
-    wrap.querySelector("input").oninput = updateCmdPreview;
-    if (wrap.querySelector("select")) wrap.querySelector("select").onchange = updateCmdPreview;
+    const input = wrap.querySelector("input, select");
+    if (input) {
+      input.oninput = updateCmdPreview;
+      input.onchange = updateCmdPreview;
+    }
   }
   el("#gen-out-dir").oninput = updateCmdPreview;
   updateCmdPreview();
@@ -552,7 +594,7 @@ function collectKnobs() {
   const cond = state.genCondition;
   const out = {};
   for (const k of cond.knobs) {
-    const node = el("#knob-" + k.name);
+    const node = document.getElementById("knob-" + k.name);
     if (!node) continue;
     if (k.type === "bool") out[k.name] = node.checked;
     else if (k.type === "int") out[k.name] = parseInt(node.value || "0", 10);
@@ -680,6 +722,9 @@ document.getElementById("gen-modal").onclick = (e) => {
   await loadScenarios();
   await refreshJobs();
   if (state.conditions.length) selectCondition(state.conditions[0].name);
+  // Auto-scan for new files every 5 seconds. Cheap — just fetches the
+  // condition list and diffs the counts.
+  setInterval(autoScan, 5000);
 })();
 </script>
 </body>

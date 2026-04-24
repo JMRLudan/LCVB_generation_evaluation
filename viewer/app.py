@@ -156,13 +156,13 @@ RENDERERS: Dict[str, Dict] = {
         "script": "pipeline/renderers/render_continuous_random.py",
         "default_out_dir": "generated/continuous_random",
         "description": (
-            "Uniform-placement sweep — single deterministic placement_frac per "
-            "item, sampled uniformly from [0, 1] via sha256 hash of item id."
+            "Uniform-placement sweep — one stratified random depth per item, "
+            "balanced across [0, 1]. Single char budget."
         ),
         "knobs": [
             {
                 "name": "num-distractor-draws",
-                "label": "Number of distractor draws",
+                "label": "Number of distractor re-renders",
                 "type": "int",
                 "default": 1,
                 "min": 1,
@@ -181,6 +181,85 @@ RENDERERS: Dict[str, Dict] = {
                 "label": "C-only variants (skip A and B baselines)",
                 "type": "bool",
                 "default": False,
+            },
+        ],
+    },
+    "mix_custom": {
+        "label": "mix (custom)",
+        "script": "pipeline/renderers/mixer.py",
+        "default_out_dir": "generated/mix_custom",
+        "description": (
+            "Direct access to the unified mixer. Set any combination of "
+            "n_distractor_draws × n_placements × n_lengths — the four named "
+            "conditions above are just presets over this same function."
+        ),
+        "knobs": [
+            {
+                "name": "n-distractor-draws",
+                "label": "n_distractor_draws (0 = no distractor)",
+                "type": "int",
+                "default": 1,
+                "min": 0,
+                "max": 10,
+            },
+            {
+                "name": "n-placements",
+                "label": "n_placements (0 = no placement axis)",
+                "type": "int",
+                "default": 1,
+                "min": 0,
+                "max": 20,
+            },
+            {
+                "name": "n-lengths",
+                "label": "n_lengths (0 = no length axis)",
+                "type": "int",
+                "default": 1,
+                "min": 0,
+                "max": 10,
+            },
+            {
+                "name": "placement-mode",
+                "label": "placement_mode",
+                "type": "choice",
+                "choices": ["uniform", "fixed"],
+                "default": "uniform",
+            },
+            {
+                "name": "placements",
+                "label": "Placements (comma-separated, fixed mode only)",
+                "type": "list_float",
+                "default": "0.0,0.25,0.5,0.75,1.0",
+            },
+            {
+                "name": "lengths",
+                "label": "Char budgets (comma-separated ints)",
+                "type": "list_int",
+                "default": "24000,224000",
+            },
+            {
+                "name": "length-names",
+                "label": "Length names (comma-separated, optional)",
+                "type": "str",
+                "default": "short,long",
+            },
+            {
+                "name": "include-constraint-inline",
+                "label": "Inline the constraint in the user message (with_constraint-style)",
+                "type": "bool",
+                "default": False,
+            },
+            {
+                "name": "c-only",
+                "label": "C-only variants",
+                "type": "bool",
+                "default": False,
+            },
+            {
+                "name": "condition-label",
+                "label": "Label written into metadata.condition",
+                "type": "str",
+                "default": "mix_custom",
             },
         ],
     },
