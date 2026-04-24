@@ -74,18 +74,11 @@ RENDERERS: Dict[str, Dict] = {
         "script": "pipeline/renderers/render_with_constraint.py",
         "default_out_dir": "generated/with_constraint",
         "description": (
-            "Direct ablation — constraint stated inline in the user message, "
-            "no conversation-history distractor."
+            "Direct ablation — evidence seeds and the constraint description "
+            "are placed inline in the user message, with no prior "
+            "conversation history. Ceiling test."
         ),
         "knobs": [
-            {
-                "name": "num-distractor-draws",
-                "label": "Item replicates per (scenario, variant, perm)",
-                "type": "int",
-                "default": 1,
-                "min": 1,
-                "max": 5,
-            },
             {
                 "name": "include-no-c-variants",
                 "label": "Include A and B (no-constraint) variants",
@@ -104,14 +97,6 @@ RENDERERS: Dict[str, Dict] = {
             "fresh user message. No distractor turns interleaved."
         ),
         "knobs": [
-            {
-                "name": "num-distractor-draws",
-                "label": "Item replicates per (scenario, variant, perm)",
-                "type": "int",
-                "default": 1,
-                "min": 1,
-                "max": 5,
-            },
             {
                 "name": "c-only",
                 "label": "C-only variants (skip A and B baselines)",
