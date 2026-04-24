@@ -230,20 +230,22 @@ RENDERERS: Dict[str, Dict] = {
         ],
     },
     "canon_fixed_grid": {
-        "label": "canon · fixed grid short/medium/long",
+        "label": "canon · fixed grid short/medium/long (n=3 stitched)",
         "script": "pipeline/renderers/mixer.py",
         "default_out_dir": "generated/canon_fixed_grid",
         "canon": True,
         "description": (
             "CANON · distractor grid sweep. Evidence placed at 5 fixed "
             "depths (0, 0.25, 0.5, 0.75, 1.0) across 3 haystacks: "
-            "short (10K budget → 8,364 chars mean), "
-            "medium (100K budget → 97,080 chars mean), "
-            "long (250K budget → 239,954 chars mean; capped by the "
-            "~200–230K-char distractor pool). C-present variants only."
+            "short (10K budget), medium (100K budget), long (250K "
+            "budget). Three distractor chats stitched end-to-end with "
+            "a 1-day gap between them, then keep-beginning truncated "
+            "to budget. C-present variants only."
         ),
         "knobs": [
             {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (full grid re-renders)"},
+            {"name": "n-distractors-per-prompt", "type": "int", "default": 3, "min": 3, "max": 3, "label": "(fixed) 3 stitched chats"},
+            {"name": "merge-gap-days", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 day gap"},
             {"name": "n-placements", "type": "int", "default": 5, "min": 5, "max": 5, "label": "(fixed) 5 depths"},
             {"name": "n-lengths", "type": "int", "default": 3, "min": 3, "max": 3, "label": "(fixed) 3 haystacks"},
             {"name": "placement-mode", "type": "choice", "choices": ["fixed"], "default": "fixed", "label": "(fixed)"},
@@ -255,18 +257,21 @@ RENDERERS: Dict[str, Dict] = {
         ],
     },
     "canon_uniform_long": {
-        "label": "canon · uniform long (250K budget → 239,960 chars mean)",
+        "label": "canon · uniform long (250K budget, n=3 stitched)",
         "script": "pipeline/renderers/mixer.py",
         "default_out_dir": "generated/canon_uniform_long",
         "canon": True,
         "description": (
             "CANON · uniform sweep. One stratified-random depth per item "
-            "in a 250K-char budget haystack — actual mean 239,960 chars "
-            "(capped by the ~200–230K-char distractor pool). Collectively "
-            "covers [0, 1] uniformly across items. C-present variants only."
+            "in a 250K-char budget haystack. Three distractor chats "
+            "stitched end-to-end with a 1-day gap between them, then "
+            "keep-beginning truncated to budget. Collectively covers "
+            "[0, 1] uniformly across items. C-present variants only."
         ),
         "knobs": [
             {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (re-renders)"},
+            {"name": "n-distractors-per-prompt", "type": "int", "default": 3, "min": 3, "max": 3, "label": "(fixed) 3 stitched chats"},
+            {"name": "merge-gap-days", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 day gap"},
             {"name": "n-placements", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 placement"},
             {"name": "n-lengths", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 length"},
             {"name": "placement-mode", "type": "choice", "choices": ["uniform"], "default": "uniform", "label": "(fixed)"},
