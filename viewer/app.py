@@ -214,46 +214,48 @@ RENDERERS: Dict[str, Dict] = {
         ],
     },
     "canon_fixed_grid": {
-        "label": "canon · fixed grid 3K/10K tok",
+        "label": "canon · fixed grid short/medium/long",
         "script": "pipeline/renderers/mixer.py",
         "default_out_dir": "generated/canon_fixed_grid",
         "canon": True,
         "description": (
             "CANON · distractor grid sweep. Evidence placed at 5 fixed "
-            "depths (0, 0.25, 0.5, 0.75, 1.0) across 2 haystacks — "
-            "3K-tok (~24K chars) and 10K-tok (~70K chars). C-present only."
+            "depths (0, 0.25, 0.5, 0.75, 1.0) across 3 haystacks — "
+            "short (10K chars), medium (100K chars), long (250K chars). "
+            "C-present variants only."
         ),
         "knobs": [
             {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (full grid re-renders)"},
             {"name": "n-placements", "type": "int", "default": 5, "min": 5, "max": 5, "label": "(fixed) 5 depths"},
-            {"name": "n-lengths", "type": "int", "default": 2, "min": 2, "max": 2, "label": "(fixed) 2 haystacks"},
+            {"name": "n-lengths", "type": "int", "default": 3, "min": 3, "max": 3, "label": "(fixed) 3 haystacks"},
             {"name": "placement-mode", "type": "choice", "choices": ["fixed"], "default": "fixed", "label": "(fixed)"},
             {"name": "placements", "type": "list_float", "default": "0.0,0.25,0.5,0.75,1.0", "label": "Depths"},
-            {"name": "lengths", "type": "list_int", "default": "24000,70000", "label": "Char budgets"},
-            {"name": "length-names", "type": "str", "default": "3k_tok,10k_tok", "label": "Length names"},
+            {"name": "lengths", "type": "list_int", "default": "10000,100000,250000", "label": "Char budgets"},
+            {"name": "length-names", "type": "str", "default": "short,medium,long", "label": "Length names"},
             {"name": "c-only", "type": "bool", "default": True, "label": "C-present variants only"},
             {"name": "condition-label", "type": "str", "default": "canon_fixed_grid", "label": "(fixed)"},
         ],
     },
-    "canon_uniform_32k": {
-        "label": "canon · uniform 32K tok",
+    "canon_uniform_long": {
+        "label": "canon · uniform long (250K chars)",
         "script": "pipeline/renderers/mixer.py",
-        "default_out_dir": "generated/canon_uniform_32k",
+        "default_out_dir": "generated/canon_uniform_long",
         "canon": True,
         "description": (
             "CANON · uniform sweep. One stratified-random depth per item "
-            "in a 32K-tok (~224K chars) haystack. Collectively covers "
-            "[0, 1] uniformly across items. C-present variants only."
+            "in a 250K-char (~36K tok at this pool's ratio) haystack. "
+            "Collectively covers [0, 1] uniformly across items. C-present "
+            "variants only."
         ),
         "knobs": [
             {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (re-renders)"},
             {"name": "n-placements", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 placement"},
             {"name": "n-lengths", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 length"},
             {"name": "placement-mode", "type": "choice", "choices": ["uniform"], "default": "uniform", "label": "(fixed)"},
-            {"name": "lengths", "type": "list_int", "default": "224000", "label": "Char budget"},
-            {"name": "length-names", "type": "str", "default": "32k_tok", "label": "Length names"},
+            {"name": "lengths", "type": "list_int", "default": "250000", "label": "Char budget"},
+            {"name": "length-names", "type": "str", "default": "long", "label": "Length names"},
             {"name": "c-only", "type": "bool", "default": True, "label": "C-present variants only"},
-            {"name": "condition-label", "type": "str", "default": "canon_uniform_32k", "label": "(fixed)"},
+            {"name": "condition-label", "type": "str", "default": "canon_uniform_long", "label": "(fixed)"},
         ],
     },
     "mix_custom": {
