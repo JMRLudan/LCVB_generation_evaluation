@@ -147,16 +147,19 @@ per prompt, plus a `manifest.json` with build metadata.
 
 ## Rendering conditions
 
-All four conditions share the same scenario set and the same deduped
-distractor pool (where applicable). They differ in how the constraint
-evidence is placed.
+All five renderers share the same scenario set and the same deduped
+distractor pool (where applicable). Under the hood they are all thin
+wrappers over `pipeline/renderers/mixer.py`, which exposes three
+orthogonal axes (`n_distractor_draws`, `n_placements`, `n_lengths`)
+plus `placement_mode` ∈ {`fixed`, `uniform`} and
+`n_distractors_per_prompt` (merged-chat stitching; default 1).
 
 ### 1. `render_with_constraint.py` — control / ceiling test
 
 Evidence seeds AND the constraint description are placed directly in
-the user message. No prior conversation history. This is the ceiling
-test: if a model fails this, it's a domain-knowledge failure, not a
-history-integration failure.
+the user message. No prior conversation history. Ceiling test — if a
+model fails this, it's a domain-knowledge failure, not a history-
+integration failure.
 
 ### 2. `render_no_distractor.py` — primary personalization condition
 
@@ -168,22 +171,53 @@ long-context attention.
 
 ### 3. `render_fixed_locations.py` — grid sweep
 
-Evidence is placed at one of five fixed depths (`0.0, 0.25, 0.5, 0.75,
-1.0`) in a conversation history filled with one topically-unrelated
-distractor conversation. Two haystack sizes (`short` ≈ 24 K chars ≈
-3–4 K tokens, `long` ≈ 224 K chars ≈ 32 K tokens). Produces the
-primacy-recency grid.
+Evidence placed at N fixed depths (default `0.0, 0.25, 0.5, 0.75, 1.0`)
+across one or more named char budgets (default `short=24_000`,
+`long=224_000`). Produces the primacy-recency grid.
 
 ### 4. `render_continuous_random.py` — uniform random placement
 
-Evidence is placed at `placement_frac ~ Uniform(0, 1)` with one draw
-per item (deterministically seeded). Single large haystack. Answers
-"what does the curve look like when placement is sampled continuously?"
+Evidence placed at a stratified-random `placement_frac ∈ [0, 1]` with
+one placement per item (deterministically seeded via sha256 of the
+item key). Single char budget. Answers "what does the curve look like
+when placement is sampled continuously?"
 
-### 5. `render_stitched_locations.py` — harder variant, NOT IMPLEMENTED
+### 5. `render_stitched_locations.py` — multi-distractor stitched
 
-Reserved for the multi-distractor stitched version. See the file's
-docstring for the invariants any implementation must satisfy.
+Picks N distinct distractor chats (`n_distractors_per_prompt`,
+default 2), merges them end-to-end with a `merge_gap_days`-day
+timestamp gap (default 1 day), then inserts evidence into the merged
+pair sequence. Each distractor is pre-truncated to `budget/N` chars
+before stitching, so every merged chat contributes a visible share of
+the final prompt regardless of budget.
+
+---
+
+## Unified mixer + canon presets
+
+`pipeline/renderers/mixer.py` is the general mixing function behind
+every renderer. For ad-hoc runs you can invoke it directly:
+
+```bash
+python pipeline/renderers/mixer.py \
+    --out-dir generated/custom \
+    --n-distractor-draws 1 --n-distractors-per-prompt 2 \
+    --n-placements 1 --n-lengths 1 \
+    --placement-mode uniform --lengths 250000 \
+    --merge-gap-days 1 --c-only \
+    --condition-label custom
+```
+
+The viewer ships four **canon presets** matching the paper's full-
+table conditions — one-click generation via the "Generate canon"
+button:
+
+| Preset | Axes | Notes |
+|---|---|---|
+| `canon_direct` | — | ceiling (constraint inline) |
+| `canon_no_distractor` | — | primary (short system-prompt history) |
+| `canon_fixed_grid` | 5 depths × 3 haystacks (10K / 100K / 250K chars), `n_distractors_per_prompt=3` | grid sweep, pre-cut stitched |
+| `canon_uniform_long` | 1 uniform placement × 250K chars, `n_distractors_per_prompt=3` | uniform sweep, pre-cut stitched |
 
 ---
 
