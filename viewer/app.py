@@ -169,6 +169,93 @@ RENDERERS: Dict[str, Dict] = {
             },
         ],
     },
+    # ──────────────────────────────────────────────────────────────
+    # Canon presets — one per row of the "full table" in the headline
+    # results. These are the renderer invocations used for the paper /
+    # paper-equivalent runs, tuned to roughly match the main repo's
+    # char budgets (~7 chars/tok for the distractor pool content).
+    # Use the "Generate canon" button to fire all four in one click.
+    # ──────────────────────────────────────────────────────────────
+    "canon_direct": {
+        "label": "canon · direct",
+        "script": "pipeline/renderers/mixer.py",
+        "default_out_dir": "generated/canon_direct",
+        "canon": True,
+        "description": (
+            "CANON · ceiling test. Evidence + constraint inline in the "
+            "user message, no conversation history. C-present variants only."
+        ),
+        "knobs": [
+            {"name": "n-distractor-draws", "type": "int", "default": 0, "min": 0, "max": 0, "label": "(fixed) n_d=0"},
+            {"name": "n-placements", "type": "int", "default": 0, "min": 0, "max": 0, "label": "(fixed) n_p=0"},
+            {"name": "n-lengths", "type": "int", "default": 0, "min": 0, "max": 0, "label": "(fixed) n_l=0"},
+            {"name": "include-constraint-inline", "type": "bool", "default": True, "label": "(fixed) inline constraint"},
+            {"name": "c-only", "type": "bool", "default": True, "label": "C-present variants only"},
+            {"name": "condition-label", "type": "str", "default": "canon_direct", "label": "(fixed)"},
+        ],
+    },
+    "canon_no_distractor": {
+        "label": "canon · no-distractor",
+        "script": "pipeline/renderers/mixer.py",
+        "default_out_dir": "generated/canon_no_distractor",
+        "canon": True,
+        "description": (
+            "CANON · primary personalization condition. Short timestamped "
+            "evidence history in the system prompt, bare query in the user "
+            "message. C-present variants only."
+        ),
+        "knobs": [
+            {"name": "n-distractor-draws", "type": "int", "default": 0, "min": 0, "max": 0, "label": "(fixed) n_d=0"},
+            {"name": "n-placements", "type": "int", "default": 0, "min": 0, "max": 0, "label": "(fixed) n_p=0"},
+            {"name": "n-lengths", "type": "int", "default": 0, "min": 0, "max": 0, "label": "(fixed) n_l=0"},
+            {"name": "include-constraint-inline", "type": "bool", "default": False, "label": "(fixed) short history"},
+            {"name": "c-only", "type": "bool", "default": True, "label": "C-present variants only"},
+            {"name": "condition-label", "type": "str", "default": "canon_no_distractor", "label": "(fixed)"},
+        ],
+    },
+    "canon_fixed_grid": {
+        "label": "canon · fixed grid 3K/10K tok",
+        "script": "pipeline/renderers/mixer.py",
+        "default_out_dir": "generated/canon_fixed_grid",
+        "canon": True,
+        "description": (
+            "CANON · distractor grid sweep. Evidence placed at 5 fixed "
+            "depths (0, 0.25, 0.5, 0.75, 1.0) across 2 haystacks — "
+            "3K-tok (~24K chars) and 10K-tok (~70K chars). C-present only."
+        ),
+        "knobs": [
+            {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (full grid re-renders)"},
+            {"name": "n-placements", "type": "int", "default": 5, "min": 5, "max": 5, "label": "(fixed) 5 depths"},
+            {"name": "n-lengths", "type": "int", "default": 2, "min": 2, "max": 2, "label": "(fixed) 2 haystacks"},
+            {"name": "placement-mode", "type": "choice", "choices": ["fixed"], "default": "fixed", "label": "(fixed)"},
+            {"name": "placements", "type": "list_float", "default": "0.0,0.25,0.5,0.75,1.0", "label": "Depths"},
+            {"name": "lengths", "type": "list_int", "default": "24000,70000", "label": "Char budgets"},
+            {"name": "length-names", "type": "str", "default": "3k_tok,10k_tok", "label": "Length names"},
+            {"name": "c-only", "type": "bool", "default": True, "label": "C-present variants only"},
+            {"name": "condition-label", "type": "str", "default": "canon_fixed_grid", "label": "(fixed)"},
+        ],
+    },
+    "canon_uniform_32k": {
+        "label": "canon · uniform 32K tok",
+        "script": "pipeline/renderers/mixer.py",
+        "default_out_dir": "generated/canon_uniform_32k",
+        "canon": True,
+        "description": (
+            "CANON · uniform sweep. One stratified-random depth per item "
+            "in a 32K-tok (~224K chars) haystack. Collectively covers "
+            "[0, 1] uniformly across items. C-present variants only."
+        ),
+        "knobs": [
+            {"name": "n-distractor-draws", "type": "int", "default": 1, "min": 1, "max": 5, "label": "Distractor draws (re-renders)"},
+            {"name": "n-placements", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 placement"},
+            {"name": "n-lengths", "type": "int", "default": 1, "min": 1, "max": 1, "label": "(fixed) 1 length"},
+            {"name": "placement-mode", "type": "choice", "choices": ["uniform"], "default": "uniform", "label": "(fixed)"},
+            {"name": "lengths", "type": "list_int", "default": "224000", "label": "Char budget"},
+            {"name": "length-names", "type": "str", "default": "32k_tok", "label": "Length names"},
+            {"name": "c-only", "type": "bool", "default": True, "label": "C-present variants only"},
+            {"name": "condition-label", "type": "str", "default": "canon_uniform_32k", "label": "(fixed)"},
+        ],
+    },
     "mix_custom": {
         "label": "mix (custom)",
         "script": "pipeline/renderers/mixer.py",
@@ -655,6 +742,83 @@ def api_render():
     t = threading.Thread(target=_run_subprocess_job, args=(job_id, cmd, env), daemon=True)
     t.start()
     return jsonify({"job_id": job_id, "cmd": cmd})
+
+
+@app.route("/api/canon", methods=["POST"])
+def api_canon():
+    """Kick off every registered canon preset in parallel. Each preset
+    writes to its own ``generated/canon_*`` dir and is tracked as its
+    own job. Returns a list of job_ids the UI can poll collectively."""
+    canon_names = [n for n, s in RENDERERS.items() if s.get("canon")]
+    job_ids = []
+    for name in canon_names:
+        spec = RENDERERS[name]
+        raw_out = spec["default_out_dir"]
+        out_dir_abs = (REPO_ROOT / raw_out).resolve()
+        script_path = REPO_ROOT / spec["script"]
+        cmd: List[str] = [sys.executable, str(script_path), "--out-dir", str(out_dir_abs)]
+        for knob in spec["knobs"]:
+            kn = knob["name"]
+            flag = "--" + kn
+            val = knob.get("default")
+            t = knob.get("type")
+            if t == "bool":
+                if val:
+                    cmd.append(flag)
+            elif t == "list_float":
+                if isinstance(val, list):
+                    cmd += [flag, ",".join(str(x) for x in val)]
+                elif val:
+                    cmd += [flag, str(val)]
+            elif t == "multi_choice":
+                if isinstance(val, list):
+                    cmd += [flag, ",".join(val)]
+                elif val:
+                    cmd += [flag, str(val)]
+            elif t in ("int",) and val == 0:
+                # n_d=0 / n_p=0 / n_l=0 need to be passed explicitly so
+                # mixer.py gets them instead of argparse defaults.
+                cmd += [flag, "0"]
+            else:
+                if val is None or val == "":
+                    continue
+                cmd += [flag, str(val)]
+        # Skip if target dir already non-empty — surface a clear error
+        # instead of silently refusing later.
+        if out_dir_abs.is_dir():
+            existing = [p for p in out_dir_abs.iterdir() if not p.name.startswith(".")]
+            if existing:
+                with JOBS_LOCK:
+                    jid = uuid.uuid4().hex[:12]
+                    JOBS[jid] = {
+                        "id": jid, "condition": name, "cmd": cmd,
+                        "out_dir": raw_out, "status": "error",
+                        "returncode": 1,
+                        "started_at": time.time(),
+                        "finished_at": time.time(),
+                        "stdout": "",
+                        "stderr": (
+                            f"{raw_out} already has {len(existing)} files. "
+                            "Delete or rename that dir before re-running canon."
+                        ),
+                    }
+                    job_ids.append(jid)
+                continue
+
+        job_id = uuid.uuid4().hex[:12]
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+        with JOBS_LOCK:
+            JOBS[job_id] = {
+                "id": job_id, "condition": name, "cmd": cmd,
+                "out_dir": raw_out, "status": "queued",
+                "started_at": time.time(),
+                "stdout": "", "stderr": "",
+            }
+        t = threading.Thread(target=_run_subprocess_job, args=(job_id, cmd, env), daemon=True)
+        t.start()
+        job_ids.append(job_id)
+    return jsonify({"job_ids": job_ids, "canon_names": canon_names})
 
 
 @app.route("/api/render/status")

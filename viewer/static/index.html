@@ -247,6 +247,7 @@
     <h1>LCVB viewer</h1>
     <div class="generate-bar">
       <button class="btn primary" id="btn-generate">Generate new…</button>
+      <button class="btn" id="btn-canon" title="Run all four canon presets in parallel (canon_direct, canon_no_distractor, canon_fixed_grid, canon_uniform_32k)">Generate canon</button>
     </div>
     <h2>Conditions</h2>
     <ul id="cond-list" class="cond-list"></ul>
@@ -827,10 +828,34 @@ function pollJob(jobId) {
   tick();
 }
 
+async function generateCanon() {
+  const btn = el("#btn-canon");
+  const prev = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Starting canon…";
+  try {
+    const r = await fetch("/api/canon", { method: "POST" });
+    if (!r.ok) {
+      btn.textContent = "Canon error";
+      setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 3000);
+      return;
+    }
+    const data = await r.json();
+    for (const jid of data.job_ids) pollJob(jid);
+    btn.textContent = `Running ${data.job_ids.length} canon jobs…`;
+    refreshJobs();
+    setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 4000);
+  } catch (e) {
+    btn.textContent = "Canon error";
+    setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 3000);
+  }
+}
+
 // ── Wire-up
 el("#filter-scenario").onchange = refreshPromptList;
 el("#filter-variant").onchange = refreshPromptList;
 el("#btn-generate").onclick = openGenerateModal;
+el("#btn-canon").onclick = generateCanon;
 el("#gen-cancel").onclick = closeGenerateModal;
 el("#gen-submit").onclick = submitGenerate;
 document.getElementById("gen-modal").onclick = (e) => {
