@@ -36,8 +36,9 @@ EOF
 # 2. Install
 pip install anthropic aiohttp
 
-# 3. Render the three conditions (one draw each)
+# 3. Render the four conditions (one draw each)
 python pipeline/renderers/render_with_constraint.py
+python pipeline/renderers/render_no_distractor.py
 python pipeline/renderers/render_fixed_locations.py
 python pipeline/renderers/render_continuous_random.py
 
@@ -146,17 +147,26 @@ per prompt, plus a `manifest.json` with build metadata.
 
 ## Rendering conditions
 
-All three conditions share the same scenario set and the same deduped
-distractor pool. They differ in how the constraint evidence is placed.
+All four conditions share the same scenario set and the same deduped
+distractor pool (where applicable). They differ in how the constraint
+evidence is placed.
 
-### 1. `render_with_constraint.py` — control condition
+### 1. `render_with_constraint.py` — control / ceiling test
 
 Evidence seeds AND the constraint description are placed directly in
 the user message. No prior conversation history. This is the ceiling
 test: if a model fails this, it's a domain-knowledge failure, not a
 history-integration failure.
 
-### 2. `render_fixed_locations.py` — grid sweep
+### 2. `render_no_distractor.py` — primary personalization condition
+
+Evidence seeds are placed in a short timestamped conversation history
+inside the system prompt; the triggering query is asked as a fresh
+user message. No distractor turns interleaved. Tests pure
+conversation-history integration — failures here can't be blamed on
+long-context attention.
+
+### 3. `render_fixed_locations.py` — grid sweep
 
 Evidence is placed at one of five fixed depths (`0.0, 0.25, 0.5, 0.75,
 1.0`) in a conversation history filled with one topically-unrelated
@@ -164,13 +174,13 @@ distractor conversation. Two haystack sizes (`short` ≈ 24 K chars ≈
 3–4 K tokens, `long` ≈ 224 K chars ≈ 32 K tokens). Produces the
 primacy-recency grid.
 
-### 3. `render_continuous_random.py` — uniform random placement
+### 4. `render_continuous_random.py` — uniform random placement
 
 Evidence is placed at `placement_frac ~ Uniform(0, 1)` with one draw
 per item (deterministically seeded). Single large haystack. Answers
 "what does the curve look like when placement is sampled continuously?"
 
-### 4. `render_stitched_locations.py` — harder variant, NOT IMPLEMENTED
+### 5. `render_stitched_locations.py` — harder variant, NOT IMPLEMENTED
 
 Reserved for the multi-distractor stitched version. See the file's
 docstring for the invariants any implementation must satisfy.

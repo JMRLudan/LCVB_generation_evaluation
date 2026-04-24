@@ -94,6 +94,32 @@ RENDERERS: Dict[str, Dict] = {
             },
         ],
     },
+    "no_distractor": {
+        "label": "no_distractor",
+        "script": "pipeline/renderers/render_no_distractor.py",
+        "default_out_dir": "generated/no_distractor",
+        "description": (
+            "Primary condition — evidence seeds placed in a short timestamped "
+            "conversation history in the system prompt; query asked as a "
+            "fresh user message. No distractor turns interleaved."
+        ),
+        "knobs": [
+            {
+                "name": "num-distractor-draws",
+                "label": "Item replicates per (scenario, variant, perm)",
+                "type": "int",
+                "default": 1,
+                "min": 1,
+                "max": 5,
+            },
+            {
+                "name": "c-only",
+                "label": "C-only variants (skip A and B baselines)",
+                "type": "bool",
+                "default": False,
+            },
+        ],
+    },
     "fixed_locations": {
         "label": "fixed_locations",
         "script": "pipeline/renderers/render_fixed_locations.py",
