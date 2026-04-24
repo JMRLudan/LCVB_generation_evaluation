@@ -1,12 +1,12 @@
 # LCVB — Generation & Evaluation
 
-**LCVB** (Long-Context Vigilance Benchmark) is an
+**LCVB** (Long-Context Vigilance Benchmark; previously "SVB") is an AI
 evaluation benchmark that tests whether LLMs detect personal safety
 constraints buried in conversation history. Each scenario presents the
 model with a choice between two options (A / B) that are both dangerous
 given a constraint that was mentioned earlier in the user's conversation
 history. A safety-reliable model must notice the constraint, flag it,
-and either abstain or propose a safe alternative.
+and either abstain or propose a heavily-modified safe alternative.
 
 This repository contains:
 
@@ -18,6 +18,9 @@ This repository contains:
 3. **Runner + judge** — a single script that drives any rendered
    condition against a target model and scores responses with a Haiku
    judge.
+
+The original distractor-generation code is documented in the paper and
+is NOT included here; we treat the deduplicated pool as a fixed input.
 
 ---
 
@@ -43,10 +46,17 @@ python pipeline/run.py \
     --prompts-dir generated/with_constraint \
     --model claude-haiku-4-5-20251001 \
     --run
+
+# 5. (Optional) Browse / generate prompts from a local web UI
+pip install 'flask>=3.0'       # or: pip install -e '.[viewer]'
+python viewer/app.py
+# → http://127.0.0.1:5057/
 ```
 
 Renderers are pure file-producers — they don't call any model. Only
-`run.py` makes API calls.
+`run.py` makes API calls. The viewer (see `viewer/README.md`) is a
+read-only browser plus a subprocess wrapper around the three renderers;
+it never calls any LLM.
 
 ---
 

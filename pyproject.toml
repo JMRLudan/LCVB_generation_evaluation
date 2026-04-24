@@ -23,6 +23,11 @@ dependencies = [
     "aiohttp>=3.9.0",
 ]
 
+[project.optional-dependencies]
+viewer = [
+    "flask>=3.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/JMRLudan/LCVB_generation_evaluation"
 Repository = "https://github.com/JMRLudan/LCVB_generation_evaluation"
