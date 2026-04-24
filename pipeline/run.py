@@ -231,8 +231,8 @@ async def run(
                                 "abstained": scores["abstained"],
                                 "input_tokens": resp.get("input_tokens", 0),
                                 "output_tokens": resp.get("output_tokens", 0),
-                                "judge_input_tokens": parsed.get("input_tokens", 0),
-                                "judge_output_tokens": parsed.get("output_tokens", 0),
+                                "judge_input_tokens": parsed.get("judge_input_tokens", 0),
+                                "judge_output_tokens": parsed.get("judge_output_tokens", 0),
                                 "latency_ms": resp.get("latency_ms", 0),
                             }
 
