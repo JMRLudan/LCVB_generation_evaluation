@@ -31,9 +31,10 @@ from typing import Dict, List, Optional, Sequence, Tuple
 # ~40-char overhead per turn line: "[YYYY-MM-DD HH:MM:SS] Role: "
 TURN_LINE_OVERHEAD = 40
 
-# Default seed-ack text pool. Kept in the main eval_pipeline module as
-# `ACKS`, re-exported here for renderers that want a self-contained import.
-DEFAULT_ACKS = ["Got it.", "I see.", "Thanks for sharing that.", "Understood.", "Noted."]
+# Default seed-ack text pool. Kept deliberately neutral — very short or
+# overly-casual acks ("Got it.", "I see.") were dropped because they can
+# read as dismissive of the evidence content.
+DEFAULT_ACKS = ["Thanks for sharing that.", "Understood.", "Noted."]
 
 
 # ──────────────────────────────────────────────────────────────────────

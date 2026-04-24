@@ -434,22 +434,39 @@ def mix(
             for h in d_hashes:
                 distractor_usage[h] = distractor_usage.get(h, 0) + 1
 
-            # Merge distractors' turn lists with a gap_days-day offset
-            # between successive chats. Intra-chat timestamps preserved.
-            if len(distractors) == 1:
-                merged_turns = distractors[0].turns
-            else:
-                merged_turns = merge_distractor_turn_lists(
-                    [d.turns for d in distractors],
-                    gap_days=merge_gap_days,
-                )
-
             for length_idx, (length_name, char_budget) in enumerate(lengths_resolved):
                 cache_key = (d_hashes, char_budget)
                 if cache_key not in pair_cache:
                     budget = char_budget - PREAMBLE_RESERVE - EVIDENCE_RESERVE - USER_MSG_RESERVE
-                    pairs = pair_units_from_turns(merged_turns)
-                    pair_cache[cache_key] = truncate_pairs_to_budget(pairs, budget)
+                    if len(distractors) == 1:
+                        pairs = pair_units_from_turns(distractors[0].turns)
+                        truncated = truncate_pairs_to_budget(pairs, budget)
+                    else:
+                        # Pre-cut: each distractor gets an equal share of
+                        # the budget, keep-beginning truncated *within*
+                        # that share. Then the pre-cut chats are merged
+                        # with a merge_gap_days gap and the merged list
+                        # becomes the final pair sequence — no further
+                        # truncation needed. This guarantees every
+                        # stitched chat contributes visibly to the
+                        # prompt, instead of keep-beginning swallowing
+                        # the budget with distractor 1 alone.
+                        per_chat_budget = budget // len(distractors)
+                        per_chat_turns: List[List[Dict]] = []
+                        for d in distractors:
+                            pairs = pair_units_from_turns(d.turns)
+                            cut = truncate_pairs_to_budget(pairs, per_chat_budget)
+                            # Flatten the pair-aligned output back into
+                            # a turn list so the merge step can shift
+                            # timestamps uniformly.
+                            per_chat_turns.append(
+                                [t for pair in cut for t in pair]
+                            )
+                        merged = merge_distractor_turn_lists(
+                            per_chat_turns, gap_days=merge_gap_days,
+                        )
+                        truncated = pair_units_from_turns(merged)
+                    pair_cache[cache_key] = truncated
                 truncated_pairs = pair_cache[cache_key]
                 n_pairs = len(truncated_pairs)
 
