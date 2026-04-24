@@ -51,6 +51,25 @@
   .cond-list li:hover { background: #faf8f2; }
   .cond-list li.selected { background: var(--accent); color: var(--accent-ink); }
   .cond-list li.selected .badge { background: #fff; color: var(--accent); }
+  .cond-list li.set-row {
+    padding-left: 28px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .cond-list li.set-row.selected { color: var(--accent-ink); }
+  .set-tag {
+    font-size: 9px;
+    background: #e9e6dd;
+    color: #6a6a6a;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-left: 4px;
+    font-family: -apple-system, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .cond-list li.set-row.selected .set-tag { background: #fff; color: var(--accent); }
   .badge {
     display: inline-block;
     font-size: 11px;
@@ -317,13 +336,15 @@
 const state = {
   conditions: [],
   currentCondition: null,
+  currentSet: null,        // which generated/<dir> to browse; null => condition default
   currentPrompt: null,
   promptList: [],
   scenarios: [],
   genCondition: null,
   pollTimer: null,
   jobPollTimers: new Map(),
-  lastCondCounts: {},  // condition name → file_count, for auto-scan diff
+  lastCondCounts: {},      // condition name → file_count (summed across sets)
+  lastSetSig: "",          // set-list fingerprint for auto-scan
 };
 
 // ── Utils
@@ -353,6 +374,7 @@ async function loadConditions() {
   const ul = el("#cond-list");
   ul.innerHTML = "";
   for (const c of state.conditions) {
+    // Condition row: name + total count across all sets
     const li = h("li", { onclick: () => selectCondition(c.name) }, [
       h("span", {}, c.label),
       h("span", { class: "badge" }, String(c.file_count)),
@@ -361,34 +383,106 @@ async function loadConditions() {
     if (c.name === state.currentCondition) li.classList.add("selected");
     ul.appendChild(li);
     state.lastCondCounts[c.name] = c.file_count;
+
+    // Sub-rows: one per set under this condition (if >1, OR if the one
+    // set isn't the canonical default — otherwise the condition row
+    // already implies the single default set).
+    const shouldList = c.sets.length > 1
+      || (c.sets.length === 1 && !c.sets[0].is_default);
+    if (shouldList) {
+      for (const s of c.sets) {
+        const tag = s.is_default ? "" : ` <span class="set-tag">custom</span>`;
+        const sub = h("li", { class: "set-row", onclick: (e) => {
+          e.stopPropagation();
+          selectSet(c.name, s.name);
+        } }, []);
+        sub.innerHTML = `<span>└ ${s.name}${tag}</span><span class="badge">${s.file_count}</span>`;
+        sub.dataset.set = s.name;
+        if (state.currentCondition === c.name && state.currentSet === s.name) {
+          sub.classList.add("selected");
+        }
+        ul.appendChild(sub);
+      }
+    }
   }
 }
 
-// Periodic poll: if any condition's file_count changed, refresh. Surfaces
-// files created by other processes (CLI runs, second terminal, etc.).
+// Handle sets that can't be attributed to any registered condition
+async function loadUnknownSets() {
+  const r = await fetch("/api/sets");
+  const data = await r.json();
+  const unknowns = (data.sets || []).filter(s => !s.condition);
+  const ul = el("#cond-list");
+  if (unknowns.length === 0) return;
+  ul.appendChild(h("li", {
+    style: "background: #fafaf5; font-size: 11px; color: var(--muted); padding: 8px 16px;",
+  }, "Unmatched sets"));
+  for (const s of unknowns) {
+    const sub = h("li", { class: "set-row", onclick: (e) => {
+      e.stopPropagation();
+      selectSet(null, s.name);
+    } }, []);
+    sub.innerHTML = `<span>${s.name}</span><span class="badge">${s.file_count}</span>`;
+    sub.dataset.set = s.name;
+    if (state.currentSet === s.name) sub.classList.add("selected");
+    ul.appendChild(sub);
+  }
+}
+
+// Periodic poll: if any condition's or set's file_count changed, refresh.
+// Surfaces files created by CLI runs, second terminal, etc. If the SET
+// LIST itself changes (new dirs on disk), rebuild the sidebar.
 async function autoScan() {
   try {
     const r = await fetch("/api/conditions");
     if (!r.ok) return;
     const conds = await r.json();
-    let changedCurrent = false;
-    let anyChanged = false;
+    // Signature: every (cond_name, set_name, count) tuple sorted
+    const sig = conds.map(c =>
+      `${c.name}:${c.file_count}|` +
+      c.sets.map(s => `${s.name}=${s.file_count}`).join(",")
+    ).join(";");
+    if (sig === state.lastSetSig) return;  // nothing to do
+
+    // Decide whether we need a full sidebar rebuild (new/removed set
+    // names) vs just badge updates (counts shifted).
+    const prevSetKeys = new Set();
+    for (const c of state.conditions) {
+      for (const s of (c.sets || [])) prevSetKeys.add(`${c.name}/${s.name}`);
+    }
+    const nextSetKeys = new Set();
     for (const c of conds) {
-      if (state.lastCondCounts[c.name] !== c.file_count) {
-        anyChanged = true;
-        if (c.name === state.currentCondition) changedCurrent = true;
-      }
+      for (const s of c.sets) nextSetKeys.add(`${c.name}/${s.name}`);
     }
-    if (anyChanged) {
-      state.conditions = conds;
-      // Update just the badge counts in-place to avoid losing scroll/selection
+    const setsChanged = prevSetKeys.size !== nextSetKeys.size
+      || [...prevSetKeys].some(k => !nextSetKeys.has(k));
+
+    state.conditions = conds;
+    state.lastSetSig = sig;
+    for (const c of conds) state.lastCondCounts[c.name] = c.file_count;
+
+    if (setsChanged) {
+      await loadConditions();
+      await loadUnknownSets();
+      _refreshCondSelection();
+    } else {
+      // Just tick the badges
       for (const c of conds) {
-        const li = document.querySelector(`#cond-list li[data-cond="${c.name}"]`);
-        if (li) li.querySelector(".badge").textContent = String(c.file_count);
-        state.lastCondCounts[c.name] = c.file_count;
+        const cr = document.querySelector(`#cond-list li[data-cond="${c.name}"]`);
+        if (cr) cr.querySelector(".badge").textContent = String(c.file_count);
+        for (const s of c.sets) {
+          const sr = document.querySelector(`#cond-list li[data-set="${s.name}"]`);
+          if (sr) sr.querySelector(".badge").textContent = String(s.file_count);
+        }
       }
-      if (changedCurrent) refreshPromptList();
     }
+
+    // If the currently-viewed set/condition saw a count change, refresh
+    // the prompt list too.
+    const curKey = state.currentSet
+      ? `${state.currentCondition || ""}/${state.currentSet}`
+      : (state.currentCondition || "");
+    refreshPromptList();  // cheap; always reflects latest disk state
   } catch (e) {
     // Network blips are fine — just skip this tick
   }
@@ -407,18 +501,42 @@ async function loadScenarios() {
 
 async function selectCondition(name) {
   state.currentCondition = name;
+  state.currentSet = null;   // implicit: condition's default dir
   state.currentPrompt = null;
-  document.querySelectorAll("#cond-list li").forEach(li => {
-    li.classList.toggle("selected", li.dataset.cond === name);
-  });
+  _refreshCondSelection();
   await refreshPromptList();
 }
 
+async function selectSet(conditionName, setName) {
+  state.currentCondition = conditionName;  // may be null for unknowns
+  state.currentSet = setName;
+  state.currentPrompt = null;
+  _refreshCondSelection();
+  await refreshPromptList();
+}
+
+function _refreshCondSelection() {
+  document.querySelectorAll("#cond-list li").forEach(li => {
+    const isCondRow = li.dataset.cond;
+    const isSetRow = li.dataset.set;
+    if (isCondRow) {
+      li.classList.toggle(
+        "selected",
+        isCondRow === state.currentCondition && !state.currentSet
+      );
+    } else if (isSetRow) {
+      li.classList.toggle("selected", isSetRow === state.currentSet);
+    }
+  });
+}
+
 async function refreshPromptList() {
-  if (!state.currentCondition) return;
+  if (!state.currentCondition && !state.currentSet) return;
   const scen = el("#filter-scenario").value;
   const variant = el("#filter-variant").value;
-  const qs = new URLSearchParams({ condition: state.currentCondition });
+  const qs = new URLSearchParams();
+  if (state.currentSet) qs.set("set", state.currentSet);
+  else qs.set("condition", state.currentCondition);
   if (scen) qs.set("scenario", scen);
   if (variant) qs.set("variant", variant);
   const r = await fetch("/api/prompts?" + qs.toString());
@@ -428,7 +546,7 @@ async function refreshPromptList() {
   const ul = el("#prompt-list");
   ul.innerHTML = "";
   if (data.files.length === 0) {
-    ul.appendChild(h("li", { class: "empty-state", style: "cursor: default;" }, "No prompts yet. Use Generate."));
+    ul.appendChild(h("li", { class: "empty-state", style: "cursor: default;" }, "No prompts in this set yet. Use Generate."));
     return;
   }
   for (const f of data.files) {
@@ -443,7 +561,9 @@ async function selectPrompt(fname) {
   document.querySelectorAll("#prompt-list li").forEach(li => {
     li.classList.toggle("selected", li.dataset.file === fname);
   });
-  const qs = new URLSearchParams({ condition: state.currentCondition, file: fname });
+  const qs = new URLSearchParams({ file: fname });
+  if (state.currentSet) qs.set("set", state.currentSet);
+  else qs.set("condition", state.currentCondition);
   const r = await fetch("/api/prompt?" + qs.toString());
   if (!r.ok) {
     el("#empty-state").textContent = `Error loading prompt: ${await r.text()}`;
@@ -719,6 +839,7 @@ document.getElementById("gen-modal").onclick = (e) => {
 
 (async function init() {
   await loadConditions();
+  await loadUnknownSets();
   await loadScenarios();
   await refreshJobs();
   if (state.conditions.length) selectCondition(state.conditions[0].name);

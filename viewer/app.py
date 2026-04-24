@@ -318,45 +318,149 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
+_GENERATED_ROOT = REPO_ROOT / "generated"
+
+
+def _set_dir_count(p: Path) -> int:
+    if not p.is_dir():
+        return 0
+    return sum(
+        1 for f in p.iterdir()
+        if f.is_file() and f.suffix == ".json" and f.name != "manifest.json"
+    )
+
+
+def _infer_set_condition(set_dir: Path) -> Optional[str]:
+    """Return the condition a prompt-set directory belongs to.
+
+    Priority:
+      1. manifest.json's ``condition`` field, if it matches a registered name.
+      2. Longest registered condition name that is a prefix of the dir name.
+      3. None.
+    """
+    mf = set_dir / "manifest.json"
+    if mf.is_file():
+        try:
+            data = json.loads(mf.read_text())
+            cond = data.get("condition")
+            if cond in RENDERERS:
+                return cond
+        except Exception:
+            pass
+    # Prefix match — prefer the longest-matching registered name
+    name = set_dir.name
+    candidates = sorted(RENDERERS.keys(), key=len, reverse=True)
+    for c in candidates:
+        if name == c or name.startswith(c + "_"):
+            return c
+    return None
+
+
+def _list_all_sets() -> List[Dict]:
+    """Every directory under generated/, each attributed to a condition
+    when possible. Order: condition registry order, then alphabetical."""
+    if not _GENERATED_ROOT.is_dir():
+        return []
+    sets = []
+    for p in sorted(_GENERATED_ROOT.iterdir()):
+        if not p.is_dir() or p.name.startswith("."):
+            continue
+        cond = _infer_set_condition(p)
+        sets.append({
+            "name": p.name,
+            "path": f"generated/{p.name}",
+            "condition": cond,
+            "is_default": cond is not None and p.name == cond,
+            "file_count": _set_dir_count(p),
+        })
+    # Sort: by condition (registry order, unknown last), then name
+    cond_order = {c: i for i, c in enumerate(RENDERERS.keys())}
+    sets.sort(key=lambda s: (
+        cond_order.get(s["condition"], len(cond_order)),
+        s["name"],
+    ))
+    return sets
+
+
+def _resolve_set_dir(set_name: str) -> Path:
+    """Safely resolve a set name to an absolute path under generated/."""
+    if not set_name or "/" in set_name or "\\" in set_name or ".." in set_name:
+        abort(400, description=f"unsafe set name: {set_name!r}")
+    p = (_GENERATED_ROOT / set_name).resolve()
+    gen_resolved = _GENERATED_ROOT.resolve()
+    if not str(p).startswith(str(gen_resolved)):
+        abort(400, description="set must stay within generated/")
+    if not p.is_dir():
+        abort(404, description=f"set not found: {set_name}")
+    return p
+
+
 @app.route("/api/conditions")
 def api_conditions():
-    """List available conditions, with counts of existing generated files."""
+    """List registered conditions (presets for the Generate modal),
+    plus the prompt-sets that currently exist on disk for each.
+
+    The ``file_count`` per condition is the SUM across all sets that
+    map to that condition (default dir plus any ``generated/{cond}_*``
+    variants). Sets not attributable to any condition appear under
+    ``unknown`` in ``/api/sets``.
+    """
+    all_sets = _list_all_sets()
+    sets_by_cond: Dict[str, List[Dict]] = {}
+    for s in all_sets:
+        if s["condition"]:
+            sets_by_cond.setdefault(s["condition"], []).append(s)
+
     out = []
     for name, spec in RENDERERS.items():
-        out_dir = REPO_ROOT / spec["default_out_dir"]
-        count = 0
-        if out_dir.is_dir():
-            count = sum(
-                1 for p in out_dir.iterdir()
-                if p.is_file() and p.suffix == ".json" and p.name != "manifest.json"
-            )
+        sets = sets_by_cond.get(name, [])
         out.append({
             "name": name,
             "label": spec["label"],
             "description": spec["description"],
             "default_out_dir": spec["default_out_dir"],
-            "file_count": count,
+            "file_count": sum(s["file_count"] for s in sets),
+            "sets": sets,
             "knobs": spec["knobs"],
         })
     return jsonify(out)
 
 
+@app.route("/api/sets")
+def api_sets():
+    """Flat list of every prompt-set directory on disk, attributed to
+    a condition where possible. Useful for a set picker that doesn't
+    hide sets whose dir name doesn't match a canonical condition."""
+    return jsonify({"sets": _list_all_sets()})
+
+
 @app.route("/api/prompts")
 def api_prompts():
-    """List prompt files under a condition's default out_dir.
+    """List prompt files in a set.
 
     Query params:
-      condition: one of the registered renderer names
+      set: directory name under generated/ (preferred). If omitted,
+        falls back to the condition's default_out_dir.
+      condition: registered renderer name. Required when ``set`` is
+        not given.
       scenario: optional scenario_id prefix filter (e.g. "AG-01")
       variant: optional evidence_variant filter
       limit: max entries returned (default 2000)
     """
-    cond = _safe_condition(request.args.get("condition", ""))
+    set_name = request.args.get("set", "").strip()
+    cond_arg = request.args.get("condition", "").strip()
     scenario = request.args.get("scenario", "").strip()
     variant = request.args.get("variant", "").strip()
     limit = int(request.args.get("limit", 2000))
 
-    out_dir = REPO_ROOT / RENDERERS[cond]["default_out_dir"]
+    if set_name:
+        out_dir = _resolve_set_dir(set_name)
+        cond = _infer_set_condition(out_dir) or ""
+    elif cond_arg:
+        cond = _safe_condition(cond_arg)
+        out_dir = REPO_ROOT / RENDERERS[cond]["default_out_dir"]
+    else:
+        abort(400, description="must supply either 'set' or 'condition'")
     if not out_dir.is_dir():
         return jsonify({"files": [], "total": 0, "out_dir": str(out_dir.relative_to(REPO_ROOT))})
 
@@ -385,17 +489,28 @@ def api_prompts():
         "total": total,
         "truncated": total > limit,
         "out_dir": str(out_dir.relative_to(REPO_ROOT)),
+        "set": out_dir.name,
+        "condition": cond,
     })
 
 
 @app.route("/api/prompt")
 def api_prompt():
-    """Load a single prompt JSON."""
-    cond = _safe_condition(request.args.get("condition", ""))
+    """Load a single prompt JSON. Accepts either ``set`` (preferred) or
+    ``condition`` (falls back to the condition's default dir)."""
+    set_name = request.args.get("set", "").strip()
+    cond_arg = request.args.get("condition", "").strip()
     fname = _safe_filename(request.args.get("file", ""))
-    path = REPO_ROOT / RENDERERS[cond]["default_out_dir"] / fname
+    if set_name:
+        out_dir = _resolve_set_dir(set_name)
+    elif cond_arg:
+        cond = _safe_condition(cond_arg)
+        out_dir = REPO_ROOT / RENDERERS[cond]["default_out_dir"]
+    else:
+        abort(400, description="must supply either 'set' or 'condition'")
+    path = out_dir / fname
     if not path.is_file():
-        abort(404, description=f"not found: {cond}/{fname}")
+        abort(404, description=f"not found: {out_dir.name}/{fname}")
 
     data = json.loads(path.read_text())
     # Parse the system prompt back into turns if it's a conversation-history
