@@ -45,6 +45,7 @@ DEFAULT_HAYSTACKS = {
 def render(
     out_dir: Path,
     num_distractor_draws: int = 1,
+    n_distractors_per_prompt: int = 1,
     depths=DEFAULT_DEPTHS,
     haystacks=None,
     c_only: bool = False,
@@ -55,6 +56,7 @@ def render(
     return mix(
         out_dir=out_dir,
         n_distractor_draws=num_distractor_draws,
+        n_distractors_per_prompt=n_distractors_per_prompt,
         n_placements=len(depths),
         n_lengths=len(haystacks),
         placement_mode="fixed",
@@ -75,6 +77,12 @@ def main():
              "with a different distractor per item.",
     )
     ap.add_argument(
+        "--n-distractors-per-prompt", type=int, default=1,
+        help="How many distractor conversations to merge per prompt "
+             "(default 1 — classic single-distractor). >1 stitches "
+             "multiple distractors end-to-end with a 1-day gap.",
+    )
+    ap.add_argument(
         "--depths", type=str, default=",".join(str(d) for d in DEFAULT_DEPTHS),
         help="Comma-separated depth values (fractions in [0, 1]).",
     )
@@ -89,6 +97,7 @@ def main():
     manifest = render(
         out_dir=out_dir,
         num_distractor_draws=args.num_distractor_draws,
+        n_distractors_per_prompt=args.n_distractors_per_prompt,
         depths=depths,
         c_only=args.c_only,
     )

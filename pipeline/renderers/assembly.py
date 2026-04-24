@@ -95,6 +95,60 @@ def truncate_pairs_to_budget(
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Multi-distractor stitching
+# ──────────────────────────────────────────────────────────────────────
+def merge_distractor_turn_lists(
+    turn_lists: Sequence[Sequence[Dict]],
+    gap_days: int = 1,
+) -> List[Dict]:
+    """Concatenate N distractor turn lists end-to-end, shifting later
+    distractors' timestamps so each begins exactly ``gap_days`` after
+    the previous ended.
+
+    Args:
+        turn_lists: ordered list of turn lists, one per distractor.
+            Each turn is ``{"timestamp": "YYYY-MM-DD HH:MM:SS",
+            "role": ..., "content": ...}``.
+        gap_days: calendar-day gap between consecutive distractors.
+            Default 1. First turn of distractor k+1 lands exactly
+            ``gap_days`` after the last turn of distractor k.
+
+    Returns:
+        A flat turn list with strictly increasing timestamps (given
+        each input is monotonic). Turns are deep-copied so callers and
+        downstream assemblers can mutate safely.
+
+    Construction notes:
+      * Per-distractor intra-turn deltas are preserved — we apply a
+        single constant offset per distractor, not per turn.
+      * Offset is computed against ``max(ts)`` / ``min(ts)`` rather
+        than positional first/last, so the function is robust to the
+        rare source row with out-of-order timestamps.
+    """
+    if not turn_lists:
+        return []
+    merged: List[Dict] = []
+    prev_end: Optional[datetime] = None
+    for tl in turn_lists:
+        copied = [dict(t) for t in tl]
+        if not copied:
+            continue
+        if prev_end is None:
+            merged.extend(copied)
+            prev_end = max(_parse_ts(t["timestamp"]) for t in copied)
+            continue
+        first_ts = min(_parse_ts(t["timestamp"]) for t in copied)
+        target_start = prev_end + timedelta(days=gap_days)
+        offset = target_start - first_ts
+        for t in copied:
+            shifted = _parse_ts(t["timestamp"]) + offset
+            t["timestamp"] = shifted.strftime("%Y-%m-%d %H:%M:%S")
+        merged.extend(copied)
+        prev_end = max(_parse_ts(t["timestamp"]) for t in copied)
+    return merged
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Evidence pair formatting
 # ──────────────────────────────────────────────────────────────────────
 def evidence_pairs_from_seeds(

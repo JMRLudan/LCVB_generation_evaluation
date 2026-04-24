@@ -42,11 +42,13 @@ def render(
     out_dir: Path,
     char_budget: int = DEFAULT_CHAR_BUDGET,
     num_distractor_draws: int = 1,
+    n_distractors_per_prompt: int = 1,
     c_only: bool = False,
 ) -> dict:
     return mix(
         out_dir=out_dir,
         n_distractor_draws=num_distractor_draws,
+        n_distractors_per_prompt=n_distractors_per_prompt,
         n_placements=1,
         n_lengths=1,
         placement_mode="uniform",
@@ -68,6 +70,12 @@ def main():
              "per item.",
     )
     ap.add_argument(
+        "--n-distractors-per-prompt", type=int, default=1,
+        help="How many distractor conversations to merge per prompt "
+             "(default 1). >1 stitches multiple distractors end-to-end "
+             "with a 1-day gap before placement.",
+    )
+    ap.add_argument(
         "--c-only", action="store_true",
         help="Only render C-present variants.",
     )
@@ -78,6 +86,7 @@ def main():
         out_dir=out_dir,
         char_budget=args.char_budget,
         num_distractor_draws=args.num_distractor_draws,
+        n_distractors_per_prompt=args.n_distractors_per_prompt,
         c_only=args.c_only,
     )
     print(f"Built {manifest['num_prompts']} prompts → {out_dir}")

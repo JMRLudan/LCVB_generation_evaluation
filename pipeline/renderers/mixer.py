@@ -94,6 +94,7 @@ from renderers.assembly import (  # noqa: E402
     DEFAULT_ACKS, build_system_prompt, pair_units_from_turns,
     truncate_pairs_to_budget, evidence_pairs_from_seeds,
     assemble_at_pair_boundary, turns_to_text, assert_alternation,
+    merge_distractor_turn_lists,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -132,19 +133,64 @@ def _stratified_placements(n: int, *key_parts: str) -> List[float]:
 # ──────────────────────────────────────────────────────────────────────
 # Distractor assignment
 # ──────────────────────────────────────────────────────────────────────
+# Per-slot base seed offset. Distinct per-slot shuffles guarantee that
+# slot-0 and slot-1 never collide on the same item, and keep usage
+# balanced within each slot independently.
+_SLOT_SEED_STRIDE = 1_000_003  # prime offset; arbitrary but stable
+
+
 def _assign_distractors(
     triples: Sequence[Tuple[str, str, str]],
     pool: Dict[str, object],
     draw_idx: int,
     seed: int,
-) -> Dict[Tuple[str, str, str], str]:
-    """Round-robin assign distractor hashes to items, with a pool
-    shuffle seeded by ``seed + draw_idx``. Balanced usage: each pool
-    entry is used ⌈N/99⌉ or ⌊N/99⌋ times."""
+    n_per_item: int = 1,
+) -> Dict[Tuple[str, str, str], Tuple[str, ...]]:
+    """Assign ``n_per_item`` distinct distractor hashes to each item.
+
+    For each of the ``n_per_item`` "slots" we produce an independent
+    pool shuffle (seeded by ``seed + draw_idx + slot * STRIDE``) and
+    walk it round-robin over items. Within a slot usage is perfectly
+    balanced (⌈N/99⌉ or ⌊N/99⌋ per hash). Across slots of the same
+    item we reject-sample on collision — the probability of a
+    same-item clash is ~k/99 so the loop terminates fast.
+
+    Returns:
+        ``{triple: (hash_slot0, hash_slot1, ..., hash_slot{n-1})}``.
+        When ``n_per_item=1``, the tuple has length 1.
+    """
     hashes = pool_hashes(pool)
-    rng = random.Random(seed + draw_idx)
-    perm = rng.sample(hashes, len(hashes))
-    return {it: perm[i % len(perm)] for i, it in enumerate(triples)}
+    n_pool = len(hashes)
+    if n_per_item > n_pool:
+        raise ValueError(
+            f"n_distractors_per_prompt={n_per_item} exceeds pool size "
+            f"({n_pool}). Can't pick that many distinct distractors per item."
+        )
+    slot_perms: List[List[str]] = []
+    for slot in range(n_per_item):
+        rng = random.Random(seed + draw_idx + slot * _SLOT_SEED_STRIDE)
+        slot_perms.append(rng.sample(hashes, n_pool))
+
+    assignment: Dict[Tuple[str, str, str], Tuple[str, ...]] = {}
+    for i, it in enumerate(triples):
+        picked: List[str] = []
+        seen: set = set()
+        for slot in range(n_per_item):
+            cand = slot_perms[slot][i % n_pool]
+            # Reject same-item collision: walk the slot's perm
+            # forward until we find an unused hash.
+            k = 0
+            while cand in seen and k < n_pool:
+                k += 1
+                cand = slot_perms[slot][(i + k) % n_pool]
+            if cand in seen:
+                raise RuntimeError(
+                    f"Pool exhausted assigning slot {slot} for item {it}"
+                )
+            picked.append(cand)
+            seen.add(cand)
+        assignment[it] = tuple(picked)
+    return assignment
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -200,6 +246,7 @@ def mix(
     out_dir: Path,
     *,
     n_distractor_draws: int = 0,
+    n_distractors_per_prompt: int = 1,
     n_placements: int = 0,
     n_lengths: int = 0,
     placement_mode: Literal["fixed", "uniform"] = "uniform",
@@ -210,6 +257,7 @@ def mix(
     c_only: bool = False,
     seed: int = ASSIGNMENT_SEED,
     condition_label: str = "mix",
+    merge_gap_days: int = 1,
 ) -> dict:
     """Unified prompt generator — see module docstring.
 
@@ -246,6 +294,14 @@ def mix(
             "n_placements and n_lengths must both be 0 when "
             "n_distractor_draws=0 (no distractor → nothing to place, "
             "no history to size)."
+        )
+    if n_distractors_per_prompt < 1:
+        raise ValueError(
+            f"n_distractors_per_prompt must be >=1, got {n_distractors_per_prompt}"
+        )
+    if not use_distractor and n_distractors_per_prompt != 1:
+        raise ValueError(
+            "n_distractors_per_prompt >1 requires n_distractor_draws >0"
         )
     if placement_mode not in ("fixed", "uniform"):
         raise ValueError(f"placement_mode must be 'fixed' or 'uniform', got {placement_mode!r}")
@@ -310,14 +366,17 @@ def mix(
     distractor_usage: Dict[str, int] = {}
 
     for draw_idx in range(n_d_eff):
-        distractor_assignment: Dict[Tuple[str, str, str], str] = {}
+        distractor_assignment: Dict[Tuple[str, str, str], Tuple[str, ...]] = {}
         if use_distractor:
-            distractor_assignment = _assign_distractors(triples, pool, draw_idx, seed)
+            distractor_assignment = _assign_distractors(
+                triples, pool, draw_idx, seed,
+                n_per_item=n_distractors_per_prompt,
+            )
 
-        # (d_hash, char_budget) → truncated pair list. Shared across
-        # any triples that happen to share both. Rebuilt per-draw to
-        # keep memory bounded.
-        pair_cache: Dict[Tuple[str, int], List] = {}
+        # (hash_tuple, char_budget) → truncated merged pair list.
+        # Only useful when two items happen to get the same tuple of
+        # hashes in the same order (rare at n>1). Kept for speed at n=1.
+        pair_cache: Dict[Tuple[Tuple[str, ...], int], List] = {}
 
         for triple in triples:
             sid, variant, perm_label = triple
@@ -370,15 +429,26 @@ def mix(
                 continue
 
             # Distractor path
-            d_hash = distractor_assignment[triple]
-            distractor = pool[d_hash]
-            distractor_usage[d_hash] = distractor_usage.get(d_hash, 0) + 1
+            d_hashes: Tuple[str, ...] = distractor_assignment[triple]
+            distractors = [pool[h] for h in d_hashes]
+            for h in d_hashes:
+                distractor_usage[h] = distractor_usage.get(h, 0) + 1
+
+            # Merge distractors' turn lists with a gap_days-day offset
+            # between successive chats. Intra-chat timestamps preserved.
+            if len(distractors) == 1:
+                merged_turns = distractors[0].turns
+            else:
+                merged_turns = merge_distractor_turn_lists(
+                    [d.turns for d in distractors],
+                    gap_days=merge_gap_days,
+                )
 
             for length_idx, (length_name, char_budget) in enumerate(lengths_resolved):
-                cache_key = (d_hash, char_budget)
+                cache_key = (d_hashes, char_budget)
                 if cache_key not in pair_cache:
                     budget = char_budget - PREAMBLE_RESERVE - EVIDENCE_RESERVE - USER_MSG_RESERVE
-                    pairs = pair_units_from_turns(distractor.turns)
+                    pairs = pair_units_from_turns(merged_turns)
                     pair_cache[cache_key] = truncate_pairs_to_budget(pairs, budget)
                 truncated_pairs = pair_cache[cache_key]
                 n_pairs = len(truncated_pairs)
@@ -407,6 +477,14 @@ def mix(
                     conv_text = turns_to_text(flat)
                     system_prompt = build_system_prompt(conv_text)
 
+                    # When only one distractor is merged, populate the
+                    # legacy singular fields for back-compat with
+                    # analysis code; leave them null for n>1 so nothing
+                    # silently treats the first hash as "the" hash.
+                    singular_hash = d_hashes[0] if len(d_hashes) == 1 else None
+                    singular_domain = (
+                        distractors[0].domain if len(d_hashes) == 1 else None
+                    )
                     meta = {
                         "scenario_id": sid,
                         "evidence_variant": variant,
@@ -424,8 +502,14 @@ def mix(
                         "constraint_description": constraint,
                         "input_char_len": len(system_prompt) + len(user_msg),
                         "condition": condition_label,
-                        "distractor_hash": d_hash,
-                        "distractor_domain": distractor.domain,
+                        "distractor_hash": singular_hash,
+                        "distractor_domain": singular_domain,
+                        "distractor_hashes": list(d_hashes),
+                        "distractor_domains": [d.domain for d in distractors],
+                        "n_distractors_merged": len(d_hashes),
+                        "merge_gap_days": (
+                            merge_gap_days if len(d_hashes) > 1 else None
+                        ),
                         "assignment_seed": seed,
                     }
                     record = {
@@ -447,6 +531,8 @@ def mix(
     manifest = {
         "condition": condition_label,
         "n_distractor_draws": n_distractor_draws,
+        "n_distractors_per_prompt": n_distractors_per_prompt,
+        "merge_gap_days": merge_gap_days if n_distractors_per_prompt > 1 else None,
         "n_placements": n_placements,
         "n_lengths": n_lengths,
         "placement_mode": placement_mode,
@@ -491,6 +577,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     ap.add_argument("--out-dir", type=str, required=True)
     ap.add_argument("--n-distractor-draws", type=int, default=0)
+    ap.add_argument(
+        "--n-distractors-per-prompt", type=int, default=1,
+        help="How many distractor conversations to merge per prompt. "
+             "1 (default) = classic single-distractor behavior. >1 stitches "
+             "multiple distractors end-to-end with --merge-gap-days between them.",
+    )
+    ap.add_argument(
+        "--merge-gap-days", type=int, default=1,
+        help="Day gap between consecutive merged distractors. "
+             "Only relevant when --n-distractors-per-prompt >1.",
+    )
     ap.add_argument("--n-placements", type=int, default=0)
     ap.add_argument("--n-lengths", type=int, default=0)
     ap.add_argument(
@@ -535,6 +632,7 @@ def main():
     manifest = mix(
         out_dir=Path(args.out_dir),
         n_distractor_draws=args.n_distractor_draws,
+        n_distractors_per_prompt=args.n_distractors_per_prompt,
         n_placements=args.n_placements,
         n_lengths=args.n_lengths,
         placement_mode=args.placement_mode,
@@ -544,6 +642,7 @@ def main():
         c_only=args.c_only,
         seed=args.seed,
         condition_label=args.condition_label,
+        merge_gap_days=args.merge_gap_days,
     )
     print(f"Built {manifest['num_prompts']} prompts → {args.out_dir}")
     ic = manifest["input_chars"]
