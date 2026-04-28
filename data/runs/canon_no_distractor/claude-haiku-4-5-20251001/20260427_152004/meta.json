@@ -1,0 +1,8 @@
+{
+  "model": "claude-haiku-4-5-20251001",
+  "run_id": "20260427_152004",
+  "condition": "canon_no_distractor",
+  "total_items": 1646,
+  "started": "2026-04-28T02:28:51.822693",
+  "temperature": 0.3
+}
