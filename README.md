@@ -208,7 +208,7 @@ python pipeline/renderers/mixer.py \
     --condition-label custom
 ```
 
-The viewer ships four **canon presets** matching the paper's full-
+The viewer ships five **canon presets** matching the paper's full-
 table conditions — one-click generation via the "Generate canon"
 button:
 
@@ -216,8 +216,9 @@ button:
 |---|---|---|
 | `canon_direct` | — | ceiling (constraint inline) |
 | `canon_no_distractor` | — | primary (short system-prompt history) |
-| `canon_fixed_grid` | 5 depths × 3 haystacks (10K / 100K / 250K chars), `n_distractors_per_prompt=3` | grid sweep, pre-cut stitched |
-| `canon_uniform_long` | 1 uniform placement × 250K chars, `n_distractors_per_prompt=3` | uniform sweep, pre-cut stitched |
+| `canon_uniform_short` | 1 stratified placement × 10K chars, `n_distractors_per_prompt=3` | uniform sweep, per-scenario stratified |
+| `canon_uniform_medium` | 1 stratified placement × 100K chars, `n_distractors_per_prompt=3` | uniform sweep, per-scenario stratified |
+| `canon_uniform_long` | 1 stratified placement × 250K chars, `n_distractors_per_prompt=3` | uniform sweep, per-scenario stratified |
 
 ---
 

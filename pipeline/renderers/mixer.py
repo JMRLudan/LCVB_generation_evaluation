@@ -130,6 +130,61 @@ def _stratified_placements(n: int, *key_parts: str) -> List[float]:
     ]
 
 
+def _per_scenario_stratified_placements(
+    triples: Sequence[Tuple[str, str, str]],
+    n_d_eff: int,
+    n_l_eff: int,
+    seed: int,
+) -> Dict[Tuple[str, str, str, int, int], float]:
+    """Stratified placement *across items within each scenario*.
+
+    Within one scenario, the cells (variant, perm, draw_idx, length_idx)
+    are listed; placements are drawn at the midpoints of equal-width
+    bins of [0, 1]; then they are deterministically permuted (RNG
+    seeded by (sid, seed)) so that each cell receives one placement and
+    placement is uncorrelated with variant / c-seed / ab-seed / draw /
+    length within the scenario.
+
+    Properties:
+    * Each scenario's mean placement is exactly the bin-midpoint
+      average ≈ 0.5.
+    * Each scenario contributes equally to every placement quantile.
+    * Marginal placement distribution across the full dataset is
+      uniform by construction.
+    * Reproducible: same seed → same assignment.
+
+    Returns:
+        ``{(sid, variant, perm_label, draw_idx, length_idx): placement_frac}``.
+    """
+    # Group triples by scenario_id, preserving the deterministic order
+    # in which they were enumerated upstream.
+    by_sid: Dict[str, List[Tuple[str, str, str]]] = {}
+    for triple in triples:
+        sid, variant, perm_label = triple
+        by_sid.setdefault(sid, []).append(triple)
+
+    out: Dict[Tuple[str, str, str, int, int], float] = {}
+    for sid, scen_triples in by_sid.items():
+        n_cells = len(scen_triples) * max(1, n_d_eff) * max(1, n_l_eff)
+        # Bin midpoints — exactly uniform across the scenario.
+        placements = [(i + 0.5) / n_cells for i in range(n_cells)]
+        # Deterministic shuffle: each scenario gets its own permutation
+        # but identical input data → identical placements.
+        rng = random.Random(seed ^ hash(("scenario_strat", sid)))
+        rng.shuffle(placements)
+
+        # Walk cells in a stable nested order (triple, draw, length) so
+        # the assignment is a pure function of the input.
+        idx = 0
+        for triple in scen_triples:
+            sid_, variant, perm_label = triple
+            for d_idx in range(max(1, n_d_eff)):
+                for l_idx in range(max(1, n_l_eff)):
+                    out[(sid_, variant, perm_label, d_idx, l_idx)] = placements[idx]
+                    idx += 1
+    return out
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Distractor assignment
 # ──────────────────────────────────────────────────────────────────────
@@ -249,7 +304,7 @@ def mix(
     n_distractors_per_prompt: int = 1,
     n_placements: int = 0,
     n_lengths: int = 0,
-    placement_mode: Literal["fixed", "uniform"] = "uniform",
+    placement_mode: Literal["fixed", "uniform", "uniform_stratified"] = "uniform",
     placements_list: Optional[Sequence[float]] = None,
     lengths_named: Optional[Dict[str, int]] = None,
     lengths_list: Optional[Sequence[int]] = None,
@@ -303,8 +358,17 @@ def mix(
         raise ValueError(
             "n_distractors_per_prompt >1 requires n_distractor_draws >0"
         )
-    if placement_mode not in ("fixed", "uniform"):
-        raise ValueError(f"placement_mode must be 'fixed' or 'uniform', got {placement_mode!r}")
+    if placement_mode not in ("fixed", "uniform", "uniform_stratified"):
+        raise ValueError(
+            f"placement_mode must be 'fixed', 'uniform', or 'uniform_stratified', "
+            f"got {placement_mode!r}"
+        )
+    if placement_mode == "uniform_stratified" and n_placements != 1:
+        raise ValueError(
+            "placement_mode='uniform_stratified' currently supports n_placements=1 "
+            "only (one stratified depth per item, balanced within scenario). "
+            f"Got n_placements={n_placements}."
+        )
     if placement_mode == "fixed" and use_distractor and n_placements > 0:
         if not placements_list:
             raise ValueError("placement_mode='fixed' requires placements_list")
@@ -358,6 +422,15 @@ def mix(
                 "Refusing to overwrite. Delete or move first, then re-run."
             )
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Precompute per-scenario stratified placement assignment when
+    # requested. The map is keyed by (sid, variant, perm, draw_idx,
+    # length_idx) and consumed inside the inner loops below.
+    strat_placement_map: Dict[Tuple[str, str, str, int, int], float] = {}
+    if placement_mode == "uniform_stratified" and use_distractor:
+        strat_placement_map = _per_scenario_stratified_placements(
+            triples, n_d_eff, n_l_eff, seed,
+        )
 
     # Stats
     built = 0
@@ -473,6 +546,12 @@ def mix(
                 # Pick placements for this (triple, draw, length)
                 if placement_mode == "fixed":
                     placements = [float(x) for x in list(placements_list)[:n_p_eff]]
+                elif placement_mode == "uniform_stratified":
+                    # Single placement, drawn from the precomputed
+                    # per-scenario stratified+balanced assignment.
+                    placements = [strat_placement_map[
+                        (sid, variant, perm_label, draw_idx, length_idx)
+                    ]]
                 else:
                     placements = _stratified_placements(
                         n_p_eff,
@@ -608,7 +687,9 @@ def main():
     ap.add_argument("--n-placements", type=int, default=0)
     ap.add_argument("--n-lengths", type=int, default=0)
     ap.add_argument(
-        "--placement-mode", choices=["fixed", "uniform"], default="uniform",
+        "--placement-mode",
+        choices=["fixed", "uniform", "uniform_stratified"],
+        default="uniform",
     )
     ap.add_argument(
         "--placements", type=str, default="",

@@ -49,9 +49,12 @@ from multi_model_runner import (  # noqa: E402
 BASE_DIR = Path(__file__).resolve().parent.parent
 RUNS_DIR = BASE_DIR / "data" / "runs"
 
-# Temperature matches the project default for distractor-heavy conditions
-# (0.3). Override with --temperature if needed.
-DEFAULT_TEMPERATURE = 0.3
+# T=0 by default for reproducibility: deterministic top-k sampling means re-runs
+# with identical prompts yield identical responses, which is critical for canon
+# regression checks and for reproducing per-scenario judge verdicts. Override
+# via --temperature if a stochastic eval is wanted (e.g. measuring response
+# variance for a single prompt).
+DEFAULT_TEMPERATURE = 0.0
 
 
 def load_items_from_dir(prompts_dir: Path) -> List[EvalItem]:
@@ -316,9 +319,28 @@ def main():
                     help="Override output runs directory (default: data/runs).")
     ap.add_argument("--cost-abort", type=float, default=0.0,
                     help="Abort the run if total cost exceeds this USD (0 = no cap).")
+    ap.add_argument(
+        "--judge-mode",
+        choices=["pure_eval", "with_analysis"],
+        default=None,
+        help=(
+            "Which judge prompt to use. 'pure_eval' (default) is the "
+            "original 4-field schema used for the canon SR/GF/FA numbers. "
+            "'with_analysis' adds the CITED_USER_INFO diagnostic field "
+            "(judge sees the user's stated facts and decides whether the "
+            "model referred back to them). New runs in with_analysis mode "
+            "populate the cited_user_info column; pure_eval leaves it blank."
+        ),
+    )
     ap.add_argument("--run", action="store_true",
                     help="Actually execute (without this flag it's a dry run).")
     args = ap.parse_args()
+
+    # Set the global judge mode before any judge calls happen.
+    if args.judge_mode:
+        import eval_pipeline
+        eval_pipeline.JUDGE_MODE = args.judge_mode
+        print(f"Judge mode: {args.judge_mode}")
 
     prompts_dir = Path(args.prompts_dir)
     condition = args.condition or prompts_dir.name
