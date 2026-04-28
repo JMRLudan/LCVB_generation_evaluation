@@ -238,67 +238,325 @@
     word-break: break-all;
     white-space: pre-wrap;
   }
+
+  /* ── Tab toggle (Prompts / Results) ─────────────────────────────────── */
+  .tab-bar { display: flex; padding: 8px 16px 0; gap: 6px; }
+  .tab-btn {
+    flex: 1; padding: 6px 8px; border: 1px solid var(--rule); background: #fff;
+    border-radius: 4px 4px 0 0; cursor: pointer; font: inherit; font-size: 12px;
+    color: var(--muted);
+  }
+  .tab-btn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  body[data-tab="prompts"] .results-only,
+  body[data-tab="prompts"] .scenario-only { display: none !important; }
+  body[data-tab="results"] .prompts-only,
+  body[data-tab="results"] .scenario-only { display: none !important; }
+  body[data-tab="scenario"] .prompts-only,
+  body[data-tab="scenario"] .results-only { display: none !important; }
+
+  /* ── Scenario tab ─────────────────────────────────────────────────── */
+  .scen-cond-checks { padding: 6px 16px 10px; border-bottom: 1px solid var(--rule); }
+  .scen-cond-checks label { display: block; font-size: 12px; padding: 2px 0; cursor: pointer; }
+  .scen-cond-checks label input { margin-right: 6px; }
+  .scen-header { background: #fdfcf6; border: 1px solid var(--rule); border-radius: 6px;
+                 padding: 14px 16px; margin-bottom: 16px; }
+  .scen-header h2 { margin: 0 0 6px; font-size: 14px; padding: 0; border: 0; text-transform: none; letter-spacing: 0; color: var(--ink); }
+  .scen-header .meta-line { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .scen-header pre { font-size: 12px; line-height: 1.5; white-space: pre-wrap;
+                     background: #fff; padding: 8px 10px; border-radius: 4px;
+                     border: 1px solid var(--rule); margin: 0 0 8px; max-height: 200px; overflow-y: auto; }
+  .chart-card { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+                padding: 12px 14px; margin-bottom: 16px; }
+  .chart-card h3 { margin: 0 0 8px; }
+  .chart-svg { width: 100%; height: 280px; }
+
+  /* small helper bar table for cond_run_summary */
+  .cond-run-table table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .cond-run-table td, .cond-run-table th { padding: 5px 8px; border-bottom: 1px solid var(--rule); }
+  .cond-run-table th { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .cond-run-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .cond-run-table .sr-bar { height: 8px; background: var(--accent); border-radius: 2px; }
+
+  /* ── Run list (Results tab, left panel) ─────────────────────────────── */
+  .run-list { list-style: none; margin: 0; padding: 0; }
+  .run-list li.run-cond-row {
+    padding: 8px 12px 4px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--rule);
+  }
+  .run-list li.run-row {
+    padding: 6px 16px 6px 28px; border-bottom: 1px solid var(--rule); cursor: pointer;
+    font-size: 12px; line-height: 1.4;
+  }
+  .run-list li.run-row:hover { background: #faf8f2; }
+  .run-list li.run-row.selected { background: var(--accent); color: var(--accent-ink); }
+  .run-list .run-id { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; }
+  .run-list .run-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .run-list li.run-row.selected .run-meta { color: #d8e6dd; }
+
+  /* ── Preset card ──────────────────────────────────────────────────── */
+  .preset-card { padding: 10px 16px; border-bottom: 1px solid var(--rule); }
+  .preset-card select { width: 100%; padding: 6px 8px; border: 1px solid var(--rule);
+    border-radius: 4px; font: inherit; background: #fff; }
+  .preset-desc { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Row list (Results tab) ───────────────────────────────────────── */
+  .row-list-results {
+    list-style: none; margin: 0; padding: 0;
+    max-height: calc(100vh - 360px); overflow-y: auto;
+  }
+  .row-list-results li {
+    padding: 5px 10px 5px 16px; border-bottom: 1px solid var(--rule); cursor: pointer;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px;
+    display: grid; grid-template-columns: 16px 1fr; gap: 4px; align-items: center;
+  }
+  .row-list-results li:hover { background: #faf8f2; }
+  .row-list-results li.selected { background: var(--accent); color: var(--accent-ink); }
+  .row-list-results .key-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-list-results .row-sub  { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .row-list-results li.selected .row-sub { color: #d8e6dd; }
+  .vig-pill { display: inline-block; width: 14px; text-align: center; font-weight: 700; font-size: 13px; }
+  .vig-pill.yes { color: #2a6f4d; }
+  .vig-pill.no  { color: #a63a3a; }
+  .vig-pill.na  { color: var(--muted); }
+
+  /* ── Run summary card (main panel) ────────────────────────────────── */
+  .run-summary {
+    background: #fdfcf6; border: 1px solid var(--rule); border-radius: 6px;
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  .run-summary h2 { margin: 0 0 8px; font-size: 12px; padding: 0; border: 0; }
+  .summary-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .summary-grid .stat { text-align: center; }
+  .summary-grid .stat .num { font-size: 19px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .summary-grid .stat .lbl { font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+
+  /* ── Group summary table ──────────────────────────────────────────── */
+  .group-summary { margin: 16px 0 20px; }
+  .group-summary h3 { margin-bottom: 6px; }
+  .group-summary table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .group-summary th, .group-summary td { padding: 5px 8px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+  .group-summary th { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .group-summary td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .group-summary tr.bar td.bar-cell {
+    position: relative; padding: 0 4px;
+  }
+  .group-summary tr.bar .sr-bar {
+    height: 8px; background: var(--accent); border-radius: 2px;
+  }
+
+  /* ── Row detail card ──────────────────────────────────────────────── */
+  .row-detail { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+                padding: 14px 16px; margin-bottom: 12px; }
+  .row-detail h3 { margin: 0 0 8px; font-size: 13px; }
+  .row-detail .field-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px;
+                           color: var(--muted); margin-bottom: 10px; padding-bottom: 8px;
+                           border-bottom: 1px dashed var(--rule); }
+  .row-detail .field-row b { color: var(--ink); font-weight: 500; }
+  .row-detail .judge-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
+  .row-detail .judge-cell { background: #f7f5ee; border-radius: 4px; padding: 6px; text-align: center; font-size: 11px; }
+  .row-detail .judge-cell .lbl { color: var(--muted); text-transform: uppercase; font-size: 9px; letter-spacing: .04em; }
+  .row-detail .judge-cell .val { font-weight: 600; color: var(--ink); margin-top: 2px; }
+  .response-box {
+    background: var(--code-bg); color: var(--code-ink); padding: 10px 12px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap;
+    border-radius: 4px; max-height: 400px; overflow-y: auto; line-height: 1.5;
+  }
+  details.collapsible { margin: 10px 0; }
+  details.collapsible summary { font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 0; color: var(--ink); }
 </style>
 </head>
-<body>
+<body data-tab="prompts">
 <div class="shell">
   <!-- LEFT PANEL -->
   <aside class="sidebar left">
     <h1>LCVB viewer</h1>
-    <div class="generate-bar">
-      <button class="btn primary" id="btn-generate">Generate new…</button>
-      <button class="btn" id="btn-canon" title="Run all four canon presets in parallel (canon_direct, canon_no_distractor, canon_fixed_grid, canon_uniform_32k)">Generate canon</button>
-    </div>
-    <h2>Conditions</h2>
-    <ul id="cond-list" class="cond-list"></ul>
 
-    <h2>Filter prompts</h2>
-    <div class="filter-row">
-      <label>Scenario</label>
-      <select id="filter-scenario"><option value="">(all)</option></select>
-    </div>
-    <div class="filter-row">
-      <label>Evidence variant</label>
-      <select id="filter-variant">
-        <option value="">(all)</option>
-        <option value="C">C</option>
-        <option value="A+C">A+C</option>
-        <option value="B+C">B+C</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-      </select>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-prompts" data-tab="prompts">Prompts</button>
+      <button class="tab-btn" id="tab-results" data-tab="results">Results</button>
+      <button class="tab-btn" id="tab-scenario" data-tab="scenario">Scenario</button>
     </div>
 
-    <h2>Prompts (<span id="prompts-count">0</span>)</h2>
-    <ul id="prompt-list" class="prompt-list"></ul>
+    <!-- ─── Prompts-tab content (existing) ─── -->
+    <div class="prompts-only">
+      <div class="generate-bar">
+        <button class="btn primary" id="btn-generate">Generate new…</button>
+        <button class="btn" id="btn-canon" title="Run all five canon presets in parallel (canon_direct, canon_no_distractor, canon_uniform_short, canon_uniform_medium, canon_uniform_long)">Generate canon</button>
+      </div>
+      <h2>Conditions</h2>
+      <ul id="cond-list" class="cond-list"></ul>
 
-    <h2>Recent jobs</h2>
-    <ul id="job-list" class="job-list"></ul>
+      <h2>Filter prompts</h2>
+      <div class="filter-row">
+        <label>Scenario</label>
+        <select id="filter-scenario"><option value="">(all)</option></select>
+      </div>
+      <div class="filter-row">
+        <label>Evidence variant</label>
+        <select id="filter-variant">
+          <option value="">(all)</option>
+          <option value="C">C</option>
+          <option value="A+C">A+C</option>
+          <option value="B+C">B+C</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+        </select>
+      </div>
+
+      <h2>Prompts (<span id="prompts-count">0</span>)</h2>
+      <ul id="prompt-list" class="prompt-list"></ul>
+
+      <h2>Recent jobs</h2>
+      <ul id="job-list" class="job-list"></ul>
+    </div>
+
+    <!-- ─── Scenario-tab content ─── -->
+    <div class="scenario-only">
+      <h2>Scenario</h2>
+      <div class="filter-row">
+        <label>Scenario</label>
+        <select id="scen-pick"></select>
+      </div>
+      <div class="filter-row">
+        <label>Metric</label>
+        <select id="scen-metric">
+          <option value="SR" selected>SR — Vigilance</option>
+          <option value="GF">GF — General flag</option>
+          <option value="CM">CM — Constraint mentioned</option>
+          <option value="CUI">CUI — Cited user info</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <label>Evidence variant</label>
+        <select id="scen-ev">
+          <option value="">(all)</option>
+          <option value="C">C</option>
+          <option value="A+C">A+C</option>
+          <option value="B+C">B+C</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <label>Permutation</label>
+        <select id="scen-perm"><option value="">(all)</option></select>
+      </div>
+
+      <h2>Conditions</h2>
+      <div class="scen-cond-checks" id="scen-cond-checks">
+        <label><input type="checkbox" value="canon_direct" checked> canon_direct</label>
+        <label><input type="checkbox" value="canon_no_distractor" checked> canon_no_distractor</label>
+        <label><input type="checkbox" value="canon_uniform_short" checked> canon_uniform_short</label>
+        <label><input type="checkbox" value="canon_uniform_medium" checked> canon_uniform_medium</label>
+        <label><input type="checkbox" value="canon_uniform_long" checked> canon_uniform_long</label>
+      </div>
+
+      <h2>Run dates</h2>
+      <div class="scen-cond-checks" id="scen-runs-checks">
+        <div class="hint" style="padding:0 0 4px;">Pick a scenario first to see available runs.</div>
+      </div>
+
+      <h2>Rows (<span id="scen-row-count">0</span>)</h2>
+      <ul id="scen-row-list" class="row-list-results"></ul>
+    </div>
+
+    <!-- ─── Results-tab content (new) ─── -->
+    <div class="results-only">
+      <h2>Runs</h2>
+      <ul id="run-list" class="run-list"></ul>
+
+      <div id="results-controls" style="display:none;">
+        <h2>Preset</h2>
+        <div class="preset-card">
+          <select id="preset-select"></select>
+          <div class="preset-desc" id="preset-desc"></div>
+        </div>
+
+        <h2>Filters</h2>
+        <div class="filter-row">
+          <label>Scenario</label>
+          <select id="results-filter-scenario"><option value="">(all)</option></select>
+        </div>
+        <div class="filter-row">
+          <label>Evidence variant</label>
+          <select id="results-filter-variant">
+            <option value="">(all)</option>
+            <option value="C">C</option>
+            <option value="A+C">A+C</option>
+            <option value="B+C">B+C</option>
+          </select>
+        </div>
+
+        <h2>Rows (<span id="results-count">0</span>)</h2>
+        <ul id="results-row-list" class="row-list-results"></ul>
+      </div>
+    </div>
   </aside>
 
   <!-- MAIN -->
   <main class="main" id="main-pane">
-    <div class="empty-state" id="empty-state">
-      Pick a condition on the left, then a prompt file.
-    </div>
-    <div id="prompt-view" style="display:none;">
-      <div id="prompt-head" style="margin-bottom: 12px;"></div>
-      <div id="turns-container" class="turns"></div>
-      <h3 style="margin-top: 24px;">User message (query)</h3>
-      <div class="turn query">
-        <div class="turn-head">
-          <span class="turn-role">Query</span>
+    <!-- Prompts-tab main -->
+    <div class="prompts-only">
+      <div class="empty-state" id="empty-state">
+        Pick a condition on the left, then a prompt file.
+      </div>
+      <div id="prompt-view" style="display:none;">
+        <div id="prompt-head" style="margin-bottom: 12px;"></div>
+        <div id="turns-container" class="turns"></div>
+        <h3 style="margin-top: 24px;">User message (query)</h3>
+        <div class="turn query">
+          <div class="turn-head">
+            <span class="turn-role">Query</span>
+          </div>
+          <div class="turn-body" id="query-body"></div>
         </div>
-        <div class="turn-body" id="query-body"></div>
+      </div>
+    </div>
+
+    <!-- Scenario-tab main -->
+    <div class="scenario-only">
+      <div class="empty-state" id="scen-empty-state">
+        Pick a scenario on the left to see all results, charts, and aggregations.
+      </div>
+      <div id="scen-view" style="display:none;">
+        <div class="scen-header" id="scen-header"></div>
+        <div class="chart-card" id="scen-chart-card">
+          <h3 id="scen-chart-title">Metric by placement decile (canon_uniform_*)</h3>
+          <svg class="chart-svg" id="scen-chart" viewBox="0 0 700 280" preserveAspectRatio="xMidYMid meet"></svg>
+          <div id="scen-chart-legend" class="hint" style="margin-top:6px;"></div>
+        </div>
+        <div class="cond-run-table" id="scen-cond-run-table"></div>
+        <div id="scen-row-detail"></div>
+      </div>
+    </div>
+
+    <!-- Results-tab main -->
+    <div class="results-only">
+      <div class="empty-state" id="results-empty-state">
+        Pick a run on the left to see its summary, presets, and rows.
+      </div>
+      <div id="run-summary-view" style="display:none;">
+        <div class="run-summary">
+          <h2 id="run-summary-title"></h2>
+          <div class="summary-grid" id="run-summary-grid"></div>
+        </div>
+        <div id="group-summary-view"></div>
+        <div id="row-detail-view"></div>
       </div>
     </div>
   </main>
 
   <!-- RIGHT PANEL -->
   <aside class="sidebar right">
-    <h1>Metadata</h1>
-    <div id="meta-view">
+    <h1 class="prompts-only">Metadata</h1>
+    <div class="prompts-only" id="meta-view">
       <div class="empty-state">No prompt selected.</div>
+    </div>
+    <h1 class="results-only">Row metadata</h1>
+    <div class="results-only" id="row-meta-view">
+      <div class="empty-state">No row selected.</div>
+    </div>
+    <h1 class="scenario-only">Scenario context</h1>
+    <div class="scenario-only" id="scen-meta-view">
+      <div class="empty-state">No scenario selected.</div>
     </div>
   </aside>
 </div>
@@ -851,6 +1109,773 @@ async function generateCanon() {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// RESULTS TAB — browse model run outputs with analytical presets
+// ══════════════════════════════════════════════════════════════════════
+const resultsState = {
+  runs: [],            // [{condition, model, run_id, n_rows, ...}]
+  presets: [],         // [{name, label, description, applies_to}]
+  currentRun: null,    // {condition, model, run_id}
+  currentRunSummary: null,
+  currentPreset: "all",
+  currentRows: [],
+  currentRowKey: null, // "sid|ev|perm"
+};
+
+async function loadResultsRuns() {
+  const r = await fetch("/api/results/runs");
+  const data = await r.json();
+  resultsState.runs = data.runs || [];
+  renderRunList();
+}
+
+async function loadResultsPresets() {
+  const r = await fetch("/api/results/presets");
+  const data = await r.json();
+  resultsState.presets = data.presets || [];
+}
+
+function renderRunList() {
+  const ul = el("#run-list");
+  ul.innerHTML = "";
+  // Group by condition
+  const byCond = {};
+  for (const r of resultsState.runs) {
+    if (!byCond[r.condition]) byCond[r.condition] = [];
+    byCond[r.condition].push(r);
+  }
+  const condOrder = ["canon_direct", "canon_no_distractor",
+                     "canon_uniform_short", "canon_uniform_medium", "canon_uniform_long"];
+  const condsSorted = Object.keys(byCond).sort((a, b) => {
+    const ai = condOrder.indexOf(a), bi = condOrder.indexOf(b);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return a.localeCompare(b);
+  });
+  for (const cond of condsSorted) {
+    const header = document.createElement("li");
+    header.className = "run-cond-row";
+    header.textContent = cond;
+    ul.appendChild(header);
+    for (const run of byCond[cond]) {
+      const li = document.createElement("li");
+      li.className = "run-row";
+      li.dataset.condition = run.condition;
+      li.dataset.model = run.model;
+      li.dataset.runId = run.run_id;
+      const started = run.started ? new Date(run.started).toLocaleString() : "(unknown date)";
+      li.innerHTML = `
+        <div class="run-id">${escapeHtml(run.run_id)}</div>
+        <div class="run-meta">${run.n_rows.toLocaleString()} rows · ${escapeHtml(run.model)}<br>${started}</div>
+      `;
+      li.onclick = () => selectRun(run.condition, run.model, run.run_id);
+      ul.appendChild(li);
+    }
+  }
+}
+
+async function selectRun(condition, model, run_id) {
+  // Highlight in list
+  document.querySelectorAll("#run-list .run-row").forEach(li => {
+    li.classList.toggle("selected",
+      li.dataset.condition === condition && li.dataset.model === model && li.dataset.runId === run_id);
+  });
+
+  resultsState.currentRun = { condition, model, run_id };
+  resultsState.currentRowKey = null;
+
+  // Show controls panel + run summary view
+  el("#results-controls").style.display = "block";
+  el("#results-empty-state").style.display = "none";
+  el("#run-summary-view").style.display = "block";
+  el("#row-detail-view").innerHTML = "";
+  el("#row-meta-view").innerHTML = "<div class='empty-state'>No row selected.</div>";
+
+  // Populate preset dropdown — filter by applies_to
+  populatePresetDropdown(condition);
+  // Populate scenario filter
+  populateScenarioFilter();
+
+  // Load run summary
+  const url = `/api/results/run?condition=${encodeURIComponent(condition)}&model=${encodeURIComponent(model)}&run_id=${encodeURIComponent(run_id)}`;
+  const r = await fetch(url);
+  if (!r.ok) {
+    el("#run-summary-grid").innerHTML = `<div>Error loading: ${r.status}</div>`;
+    return;
+  }
+  const summary = await r.json();
+  resultsState.currentRunSummary = summary;
+  renderRunSummary(summary);
+
+  // Load rows for the current preset
+  await refreshResultsRows();
+}
+
+function renderRunSummary(s) {
+  el("#run-summary-title").textContent = `${s.condition} · ${s.model} · ${s.run_id}`;
+  const stats = [
+    ["SR%", s.SR_pct],
+    ["GF%", s.GF_pct],
+    ["FA%", s.FA_pct],
+    ["abst%", s.abstain_pct],
+    ["n", s.n_rows],
+    ["err", s.n_errors],
+  ];
+  el("#run-summary-grid").innerHTML = stats.map(([l, v]) => `
+    <div class="stat">
+      <div class="num">${v == null ? "—" : (typeof v === "number" && l.endsWith("%") ? v.toFixed(1) : v)}</div>
+      <div class="lbl">${l}</div>
+    </div>
+  `).join("");
+}
+
+function populatePresetDropdown(condition) {
+  const sel = el("#preset-select");
+  sel.innerHTML = "";
+  const filtered = resultsState.presets.filter(p =>
+    !p.applies_to || p.applies_to.includes(condition)
+  );
+  for (const p of filtered) {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.label;
+    sel.appendChild(opt);
+  }
+  // Default to current preset if still applicable, else first
+  if (filtered.find(p => p.name === resultsState.currentPreset)) {
+    sel.value = resultsState.currentPreset;
+  } else {
+    sel.value = filtered.length ? filtered[0].name : "all";
+    resultsState.currentPreset = sel.value;
+  }
+  updatePresetDescription();
+}
+
+function updatePresetDescription() {
+  const p = resultsState.presets.find(p => p.name === resultsState.currentPreset);
+  el("#preset-desc").textContent = p ? p.description : "";
+}
+
+function populateScenarioFilter() {
+  const sel = el("#results-filter-scenario");
+  sel.innerHTML = '<option value="">(all)</option>';
+  for (const s of state.scenarios) {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = `${s.id} — ${(s.domain || "").slice(0, 40)}`;
+    sel.appendChild(opt);
+  }
+}
+
+async function refreshResultsRows() {
+  const run = resultsState.currentRun;
+  if (!run) return;
+  const params = new URLSearchParams({
+    condition: run.condition,
+    model: run.model,
+    run_id: run.run_id,
+    preset: resultsState.currentPreset,
+    scenario: el("#results-filter-scenario").value || "",
+    evidence_variant: el("#results-filter-variant").value || "",
+    limit: "500",
+  });
+  const r = await fetch("/api/results/rows?" + params.toString());
+  if (!r.ok) return;
+  const data = await r.json();
+  resultsState.currentRows = data.rows;
+  el("#results-count").textContent =
+    data.n_matched.toLocaleString() + (data.truncated ? ` (showing ${data.rows.length})` : "");
+
+  renderResultsRowList(data.rows);
+  renderGroupSummary(data.group_summary);
+}
+
+function renderResultsRowList(rows) {
+  const ul = el("#results-row-list");
+  ul.innerHTML = "";
+  for (const r of rows) {
+    const li = document.createElement("li");
+    const key = `${r.scenario_id}|${r.evidence_variant}|${r.permutation}`;
+    li.dataset.key = key;
+    let vigClass = "na", vigChar = "—";
+    if (r.vigilance === "1") { vigClass = "yes"; vigChar = "✓"; }
+    else if (r.vigilance === "0") { vigClass = "no";  vigChar = "✗"; }
+    if (r.is_error) { vigClass = "no"; vigChar = "!"; }
+    const placement = (r.placement_frac == null) ? "" : ` p=${(+r.placement_frac).toFixed(2)}`;
+    li.innerHTML = `
+      <span class="vig-pill ${vigClass}">${vigChar}</span>
+      <div>
+        <div class="key-line">${escapeHtml(r.scenario_id)} ${escapeHtml(r.evidence_variant)} ${escapeHtml(r.permutation)}</div>
+        <div class="row-sub">${escapeHtml(r.recommendation || "")} · ${escapeHtml((r.domain || "").slice(0, 30))}${placement}</div>
+      </div>
+    `;
+    li.onclick = () => selectResultsRow(key);
+    if (key === resultsState.currentRowKey) li.classList.add("selected");
+    ul.appendChild(li);
+  }
+}
+
+function renderGroupSummary(groups) {
+  const div = el("#group-summary-view");
+  if (!groups || !groups.length) { div.innerHTML = ""; return; }
+  const maxSR = Math.max(...groups.map(g => g.SR_pct || 0));
+  const rows = groups.map(g => `
+    <tr>
+      <td>${escapeHtml(g.group)}</td>
+      <td class="num">${g.n}</td>
+      <td class="num">${g.SR_pct == null ? "—" : g.SR_pct.toFixed(1) + "%"}</td>
+      <td class="bar-cell">
+        <div class="sr-bar" style="width:${g.SR_pct == null ? 0 : (g.SR_pct / 100 * 100).toFixed(1)}%; opacity:${g.SR_pct == null ? 0 : 0.85}"></div>
+      </td>
+      <td class="num">${g.mean_input_tokens.toLocaleString()}</td>
+      <td class="num">${g.mean_output_tokens.toLocaleString()}</td>
+    </tr>
+  `).join("");
+  div.innerHTML = `
+    <div class="group-summary">
+      <h3>Group summary</h3>
+      <table>
+        <thead><tr>
+          <th>Group</th><th class="num">n</th><th class="num">SR</th><th>SR (bar)</th>
+          <th class="num">in tok</th><th class="num">out tok</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function selectResultsRow(key) {
+  resultsState.currentRowKey = key;
+  document.querySelectorAll("#results-row-list li").forEach(li =>
+    li.classList.toggle("selected", li.dataset.key === key));
+  const [sid, ev, perm] = key.split("|");
+  const run = resultsState.currentRun;
+  const url = `/api/results/row?condition=${encodeURIComponent(run.condition)}&model=${encodeURIComponent(run.model)}&run_id=${encodeURIComponent(run.run_id)}&scenario_id=${encodeURIComponent(sid)}&evidence_variant=${encodeURIComponent(ev)}&permutation=${encodeURIComponent(perm)}`;
+  const r = await fetch(url);
+  if (!r.ok) return;
+  const row = await r.json();
+  renderRowDetail(row);
+}
+
+function evidenceSeedsHtml(row) {
+  const seeds = row._evidence_seeds || [];
+  const all = row._evidence_variant_breakdown || {};
+  if (!seeds.length && !(all.all_c_seeds || all.all_a_seeds || all.all_b_seeds)) {
+    return "";
+  }
+
+  const SET_COLOR = { C: "#7b3f00", A: "#1f5fa6", B: "#7e1f7e" };
+  const usedHtml = seeds.map(s => `
+    <div style="margin: 6px 0 8px; padding: 8px 10px; border-left: 3px solid ${SET_COLOR[s.set] || "#888"}; background: #fdfcf6; border-radius: 0 4px 4px 0;">
+      <div style="font-size: 11px; color: var(--muted); margin-bottom: 3px;">
+        <b style="color: ${SET_COLOR[s.set] || "#888"};">${s.set}${s.index}</b> · ${escapeHtml(s.label)}
+      </div>
+      <div style="font-size: 12.5px; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(s.text)}</div>
+    </div>
+  `).join("");
+
+  // Show *all* seed options the scenario has, so the user can see the full
+  // pool — not just the one this row drew. Selected ones get highlighted.
+  function setBlock(setName, list) {
+    if (!list || !list.length) return "";
+    const used = (row._seed_indices || {})[setName.toLowerCase()];
+    const items = list.map((text, i) => {
+      const isUsed = i === used;
+      const bg = isUsed ? `${SET_COLOR[setName]}22` : "transparent";
+      const wt = isUsed ? "600" : "400";
+      return `<div style="padding: 4px 6px; margin: 2px 0; background: ${bg}; border-radius: 3px; font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; font-weight: ${wt};">
+        <span style="color: ${SET_COLOR[setName]}; font-family: monospace; font-weight: 600;">${setName}${i}${isUsed ? " ✓" : ""}</span>
+        ${escapeHtml(text)}
+      </div>`;
+    }).join("");
+    return `<div style="margin-top: 8px;">
+      <div style="font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .04em; margin-bottom: 2px;">All ${setName}-set seeds</div>
+      ${items}
+    </div>`;
+  }
+
+  return `
+    <details class="collapsible" open>
+      <summary><b>Evidence seeds used in this row</b> <span class="hint">(variant ${escapeHtml(all.variant || "?")} · perm ${escapeHtml(all.permutation || "?")})</span></summary>
+      ${usedHtml || `<div class="hint">(no seeds resolved for this row)</div>`}
+      <details class="collapsible" style="margin-top: 8px;">
+        <summary class="hint">All seed options for this scenario</summary>
+        <div style="margin-top: 4px;">
+          ${setBlock("C", all.all_c_seeds)}
+          ${setBlock("A", all.all_a_seeds)}
+          ${setBlock("B", all.all_b_seeds)}
+        </div>
+      </details>
+    </details>
+  `;
+}
+
+function renderRowDetail(row) {
+  const sc = row._scenario || {};
+  const placement = row._placement_frac;
+  const dd = row._distractor_domains || [];
+  const prompt = row._prompt;
+
+  // Helper: format judge cell
+  const jc = (lbl, val) => `<div class="judge-cell"><div class="lbl">${lbl}</div><div class="val">${escapeHtml(val == null || val === "" ? "—" : String(val))}</div></div>`;
+
+  const judge = `
+    <div class="judge-grid">
+      ${jc("vigilance",    row.vigilance === "1" ? "✓" : (row.vigilance === "0" ? "✗" : "—"))}
+      ${jc("general_flag", row.general_flag === "1" ? "✓" : "—")}
+      ${jc("false_alarm",  row.false_alarm === "1" ? "✓" : "—")}
+      ${jc("abstained",    row.abstained === "1" ? "✓" : "—")}
+      ${jc("recommendation", row.recommendation || "—")}
+    </div>
+  `;
+
+  const fields = [
+    ["scenario", row.scenario_id],
+    ["variant", row.evidence_variant],
+    ["permutation", row.permutation],
+    ["expected", row.expected_answer],
+    ["domain", sc.domain],
+    ["risk", sc.risk_level],
+  ];
+  if (placement != null) fields.push(["placement_frac", (+placement).toFixed(3)]);
+  if (dd.length) fields.push(["distractor_domains", dd.join(", ")]);
+
+  const fieldRow = fields.map(([k, v]) =>
+    `<span><b>${k}:</b> ${escapeHtml(v == null ? "—" : String(v))}</span>`
+  ).join(" · ");
+
+  const promptBlock = prompt ? `
+    <details class="collapsible">
+      <summary>User message (${(prompt.user_message || "").length} chars)</summary>
+      <pre class="response-box">${escapeHtml(prompt.user_message || "")}</pre>
+    </details>
+    <details class="collapsible">
+      <summary>System prompt (${(prompt.system_prompt || "").length.toLocaleString()} chars)</summary>
+      <pre class="response-box" style="max-height:500px;">${escapeHtml(prompt.system_prompt || "")}</pre>
+    </details>
+  ` : `<div class="hint">(no prompt JSON on disk for this row)</div>`;
+
+  el("#row-detail-view").innerHTML = `
+    <div class="row-detail">
+      <h3>${escapeHtml(row.scenario_id)} · ${escapeHtml(row.evidence_variant)} / ${escapeHtml(row.permutation)}</h3>
+      <div class="field-row">${fieldRow}</div>
+      ${judge}
+      ${evidenceSeedsHtml(row)}
+      ${promptBlock}
+      <details class="collapsible" open>
+        <summary>Raw response (${(row.raw_response || "").length.toLocaleString()} chars · ${row.input_tokens || "?"} in / ${row.output_tokens || "?"} out tok · ${row.latency_ms || "?"} ms)</summary>
+        <pre class="response-box">${escapeHtml(row.raw_response || "")}</pre>
+      </details>
+      <details class="collapsible">
+        <summary>Judge explanation</summary>
+        <pre class="response-box" style="max-height:200px;">${escapeHtml(row.explanation || "")}</pre>
+      </details>
+    </div>
+  `;
+
+  // Right panel: scenario context
+  el("#row-meta-view").innerHTML = `
+    <div style="padding: 12px 16px;">
+      <h3>${escapeHtml(row.scenario_id)}</h3>
+      <p class="hint">${escapeHtml(sc.domain || "")}</p>
+      <details open><summary><b>Constraint</b></summary>
+        <pre style="white-space:pre-wrap; font-size: 11.5px; line-height:1.5; margin-top: 6px;">${escapeHtml(sc.constraint_description || "")}</pre>
+      </details>
+      <p style="font-size:12px; margin-top: 12px;"><b>A:</b> ${escapeHtml(sc.choice_a_label || "")}</p>
+      <p style="font-size:12px;"><b>B:</b> ${escapeHtml(sc.choice_b_label || "")}</p>
+    </div>
+  `;
+}
+
+// ── Tab switching
+function switchTab(name) {
+  document.body.dataset.tab = name;
+  document.querySelectorAll(".tab-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === name));
+  if (name === "results" && resultsState.runs.length === 0) {
+    loadResultsRuns();
+  }
+  if (name === "scenario" && scenState.scenarios.length === 0) {
+    loadScenarioList();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SCENARIO TAB — pivot from runs to scenarios
+// ══════════════════════════════════════════════════════════════════════
+const scenState = {
+  scenarios: [],     // [{id, domain, risk_level, ...}]
+  currentSid: null,
+  currentEv: "",
+  currentPerm: "",
+  currentMetric: "SR",  // SR | GF | CM | CUI
+  enabledConditions: new Set([
+    "canon_direct", "canon_no_distractor",
+    "canon_uniform_short", "canon_uniform_medium", "canon_uniform_long",
+  ]),
+  enabledRunIds: null, // null = all
+  data: null,          // last /api/scenario response
+  selectedRowKey: null,
+};
+
+const METRIC_AXIS_LABELS = {
+  SR:  "SR (vigilance %)",
+  GF:  "General flag (%)",
+  CM:  "Constraint mentioned (%)",
+  CUI: "Cited user info (%)",
+};
+const METRIC_TITLES = {
+  SR:  "SR (vigilance) by placement decile",
+  GF:  "General flag rate by placement decile",
+  CM:  "Constraint-mentioned rate by placement decile",
+  CUI: "Cited-user-info rate by placement decile",
+};
+
+async function loadScenarioList() {
+  const r = await fetch("/api/scenarios_list");
+  const data = await r.json();
+  scenState.scenarios = data.scenarios || [];
+  const sel = el("#scen-pick");
+  sel.innerHTML = '<option value="">— select —</option>';
+  for (const s of scenState.scenarios) {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    const dom = (s.domain || "").split("—")[0].trim();
+    opt.textContent = `${s.id} — ${dom}`;
+    sel.appendChild(opt);
+  }
+}
+
+async function refreshScenarioPermDropdown() {
+  // Fetch the scenario once to discover its available permutations.
+  if (!scenState.currentSid) return;
+  const url = "/api/scenario?" + new URLSearchParams({
+    scenario_id: scenState.currentSid,
+    evidence_variant: scenState.currentEv,
+  });
+  const r = await fetch(url);
+  if (!r.ok) return;
+  const d = await r.json();
+  const perms = Array.from(new Set(d.rows.map(x => x.permutation))).sort();
+  const sel = el("#scen-perm");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">(all)</option>';
+  for (const p of perms) {
+    const opt = document.createElement("option");
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  }
+  if (perms.includes(cur)) sel.value = cur;
+}
+
+async function refreshScenarioView() {
+  if (!scenState.currentSid) {
+    el("#scen-view").style.display = "none";
+    el("#scen-empty-state").style.display = "block";
+    return;
+  }
+  const params = new URLSearchParams({
+    scenario_id: scenState.currentSid,
+    evidence_variant: scenState.currentEv || "",
+    permutation: scenState.currentPerm || "",
+    conditions: Array.from(scenState.enabledConditions).join(","),
+    metric: scenState.currentMetric,
+  });
+  if (scenState.enabledRunIds && scenState.enabledRunIds.size) {
+    params.set("run_ids", Array.from(scenState.enabledRunIds).join(","));
+  }
+  const r = await fetch("/api/scenario?" + params.toString());
+  if (!r.ok) {
+    el("#scen-view").innerHTML = `<div class="empty-state">Error: ${r.status}</div>`;
+    return;
+  }
+  const d = await r.json();
+  scenState.data = d;
+  el("#scen-empty-state").style.display = "none";
+  el("#scen-view").style.display = "block";
+  renderScenarioHeader(d);
+  renderScenarioChart(d);
+  renderScenarioCondRunTable(d);
+  renderScenarioRowList(d);
+  renderScenarioMetaPane(d);
+  renderScenarioRunCheckboxes(d);
+}
+
+function renderScenarioHeader(d) {
+  const s = d.scenario;
+  el("#scen-header").innerHTML = `
+    <h2>${escapeHtml(s.id)} — ${escapeHtml(s.domain || "")}</h2>
+    <div class="meta-line">risk_level: <b>${escapeHtml(s.risk_level || "—")}</b> · ${d.n_rows} rows match</div>
+    <pre>${escapeHtml(s.constraint_description || "")}</pre>
+    <div style="font-size:12px;"><b>A:</b> ${escapeHtml(s.choice_a_label || "")}</div>
+    <div style="font-size:12px;"><b>B:</b> ${escapeHtml(s.choice_b_label || "")}</div>
+  `;
+}
+
+function renderScenarioChart(d) {
+  const metricKey = (d.metric && d.metric.key) || "SR";
+  const yLabel = METRIC_AXIS_LABELS[metricKey] || "metric (%)";
+  el("#scen-chart-title").textContent = METRIC_TITLES[metricKey] || "Metric by placement decile";
+
+  const svg = el("#scen-chart");
+  const W = 700, H = 280, padL = 60, padR = 130, padT = 16, padB = 36;
+  const xScale = x => padL + x * (W - padL - padR);
+  const yScale = y => H - padB - (y / 100) * (H - padT - padB);
+
+  let html = '';
+  // grid lines
+  for (let y = 0; y <= 100; y += 25) {
+    html += `<line x1="${padL}" y1="${yScale(y)}" x2="${W-padR}" y2="${yScale(y)}" stroke="#e4e4e0" stroke-width="1"/>`;
+    html += `<text x="${padL-6}" y="${yScale(y)+4}" font-size="10" fill="#6b6b6b" text-anchor="end">${y}%</text>`;
+  }
+  // x axis
+  html += `<line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="#1a1a1a" stroke-width="1"/>`;
+  html += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${H-padB}" stroke="#1a1a1a" stroke-width="1"/>`;
+  for (let x = 0; x <= 1; x += 0.2) {
+    html += `<line x1="${xScale(x)}" y1="${H-padB}" x2="${xScale(x)}" y2="${H-padB+4}" stroke="#1a1a1a"/>`;
+    html += `<text x="${xScale(x)}" y="${H-padB+18}" font-size="10" fill="#6b6b6b" text-anchor="middle">${x.toFixed(1)}</text>`;
+  }
+  html += `<text x="${(padL+W-padR)/2}" y="${H-4}" font-size="11" fill="#1a1a1a" text-anchor="middle">placement_frac</text>`;
+  html += `<text x="14" y="${H/2}" font-size="11" fill="#1a1a1a" text-anchor="middle" transform="rotate(-90 14 ${H/2})">${yLabel}</text>`;
+
+  // Color per condition
+  const colors = {
+    "canon_uniform_short":  "#3b82f6",
+    "canon_uniform_medium": "#f59e0b",
+    "canon_uniform_long":   "#10b981",
+  };
+  const series = d.chart_placement_decile || [];
+  let legendItems = [];
+
+  for (const s of series) {
+    const c = colors[s.condition] || "#888";
+    const pts = s.points.filter(p => p.metric_pct !== null);
+    if (!pts.length) continue;
+    const path = pts.map((p, i) =>
+      `${i === 0 ? "M" : "L"} ${xScale(p.x).toFixed(1)} ${yScale(p.metric_pct).toFixed(1)}`
+    ).join(" ");
+    html += `<path d="${path}" fill="none" stroke="${c}" stroke-width="2"/>`;
+    for (const p of pts) {
+      const r = 3 + Math.min(4, Math.log2(Math.max(1, p.n)));
+      html += `<circle cx="${xScale(p.x).toFixed(1)}" cy="${yScale(p.metric_pct).toFixed(1)}" r="${r.toFixed(1)}" fill="${c}" stroke="#fff" stroke-width="1">
+                 <title>${s.condition} (${s.run_id})  decile ${p.decile}  n=${p.n}  ${metricKey}=${p.metric_pct}%</title>
+               </circle>`;
+    }
+    legendItems.push({label: `${s.condition.replace("canon_uniform_","")} (${s.run_id.slice(0,8)})`, color: c});
+  }
+
+  // Horizontal lines for canon_direct / canon_no_distractor (fixed reference)
+  const refColors = {"canon_direct": "#6b7280", "canon_no_distractor": "#a78bfa"};
+  for (const e of (d.cond_run_summary || [])) {
+    if (!(e.condition in refColors)) continue;
+    if (e.metric_pct == null) continue;
+    const c = refColors[e.condition];
+    const y = yScale(e.metric_pct);
+    html += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="${c}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.85">
+               <title>${e.condition} (${e.run_id})  ${metricKey}=${e.metric_pct}%  n=${e.n}</title>
+             </line>`;
+    legendItems.push({label: `${e.condition.replace("canon_","")} ref`, color: c, dashed: true});
+  }
+
+  // Legend (right side)
+  let lx = W - padR + 10, ly = padT + 10;
+  for (const it of legendItems) {
+    html += `<line x1="${lx}" y1="${ly}" x2="${lx+18}" y2="${ly}" stroke="${it.color}" stroke-width="2" ${it.dashed ? 'stroke-dasharray="4,3"' : ''}/>`;
+    html += `<text x="${lx+22}" y="${ly+4}" font-size="10" fill="#1a1a1a">${it.label}</text>`;
+    ly += 14;
+  }
+
+  if (!series.length) {
+    html += `<text x="${W/2}" y="${H/2}" font-size="13" fill="#6b6b6b" text-anchor="middle">(no canon_uniform_* rows match the current filter)</text>`;
+  }
+  svg.innerHTML = html;
+}
+
+function renderScenarioCondRunTable(d) {
+  const e = d.cond_run_summary || [];
+  if (!e.length) { el("#scen-cond-run-table").innerHTML = ""; return; }
+  const metricKey = (d.metric && d.metric.key) || "SR";
+  el("#scen-cond-run-table").innerHTML = `
+    <h3>Per-condition × run aggregation — ${metricKey}</h3>
+    <table>
+      <thead><tr><th>Condition</th><th>Run</th>
+        <th class="num">n</th><th class="num">${metricKey}%</th><th>${metricKey} (bar)</th>
+        <th class="num">in tok</th><th class="num">out tok</th></tr></thead>
+      <tbody>
+        ${e.map(row => `
+          <tr>
+            <td>${escapeHtml(row.condition)}</td>
+            <td style="font-family:monospace; font-size:11px;">${escapeHtml(row.run_id)}</td>
+            <td class="num">${row.n}</td>
+            <td class="num">${row.metric_pct == null ? "—" : row.metric_pct.toFixed(1) + "%"}</td>
+            <td><div class="sr-bar" style="width:${(row.metric_pct||0).toFixed(1)}%; opacity:0.85"></div></td>
+            <td class="num">${row.mean_input_tokens.toLocaleString()}</td>
+            <td class="num">${row.mean_output_tokens.toLocaleString()}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderScenarioRowList(d) {
+  const ul = el("#scen-row-list");
+  ul.innerHTML = "";
+  el("#scen-row-count").textContent = d.n_rows;
+  for (const r of d.rows) {
+    const li = document.createElement("li");
+    const key = `${r.condition}|${r.run_id}|${r.evidence_variant}|${r.permutation}`;
+    li.dataset.key = key;
+    let vc = "na", vch = "—";
+    if (r.vigilance === "1") { vc = "yes"; vch = "✓"; }
+    else if (r.vigilance === "0") { vc = "no";  vch = "✗"; }
+    if (r.is_error) { vc = "no"; vch = "!"; }
+    const placement = (r.placement_frac == null) ? "" : ` p=${(+r.placement_frac).toFixed(2)}`;
+    li.innerHTML = `
+      <span class="vig-pill ${vc}">${vch}</span>
+      <div>
+        <div class="key-line">${escapeHtml(r.condition)}</div>
+        <div class="row-sub">${escapeHtml(r.evidence_variant || "")}/${escapeHtml(r.permutation || "")} · ${escapeHtml(r.run_id || "")} · rec=${escapeHtml(r.recommendation || "")}${placement}</div>
+      </div>
+    `;
+    li.onclick = () => selectScenRow(r);
+    if (key === scenState.selectedRowKey) li.classList.add("selected");
+    ul.appendChild(li);
+  }
+}
+
+async function selectScenRow(r) {
+  const key = `${r.condition}|${r.run_id}|${r.evidence_variant}|${r.permutation}`;
+  scenState.selectedRowKey = key;
+  document.querySelectorAll("#scen-row-list li").forEach(li =>
+    li.classList.toggle("selected", li.dataset.key === key));
+  // Reuse the row-detail endpoint — it returns raw_response, prompt JSON, etc.
+  const url = "/api/results/row?" + new URLSearchParams({
+    condition: r.condition, model: r.model, run_id: r.run_id,
+    scenario_id: r.scenario_id, evidence_variant: r.evidence_variant,
+    permutation: r.permutation,
+  });
+  const resp = await fetch(url);
+  if (!resp.ok) return;
+  const row = await resp.json();
+  const placement = row._placement_frac;
+  const dd = row._distractor_domains || [];
+  const fields = [
+    ["condition", r.condition],
+    ["run", r.run_id],
+    ["expected", row.expected_answer],
+    ["recommendation", row.recommendation || "—"],
+    ["flagged", row.flagged || "—"],
+    ["constraint_mentioned", row.constraint_mentioned || "—"],
+    ["heavily_modified", row.heavily_modified || "—"],
+  ];
+  if (placement != null) fields.push(["placement_frac", (+placement).toFixed(3)]);
+  if (dd.length) fields.push(["distractors", dd.slice(0, 3).join(", ") + (dd.length > 3 ? "…" : "")]);
+  const fieldRow = fields.map(([k, v]) => `<span><b>${k}:</b> ${escapeHtml(String(v))}</span>`).join(" · ");
+  const promptBlock = row._prompt ? `
+    <details class="collapsible">
+      <summary>User message (${(row._prompt.user_message || "").length} chars)</summary>
+      <pre class="response-box">${escapeHtml(row._prompt.user_message || "")}</pre>
+    </details>
+    <details class="collapsible">
+      <summary>System prompt (${(row._prompt.system_prompt || "").length.toLocaleString()} chars)</summary>
+      <pre class="response-box" style="max-height:500px;">${escapeHtml(row._prompt.system_prompt || "")}</pre>
+    </details>
+  ` : `<div class="hint">(no prompt JSON for this row)</div>`;
+
+  el("#scen-row-detail").innerHTML = `
+    <div class="row-detail">
+      <h3>Row detail · ${escapeHtml(r.evidence_variant)}/${escapeHtml(r.permutation)}</h3>
+      <div class="field-row">${fieldRow}</div>
+      ${evidenceSeedsHtml(row)}
+      ${promptBlock}
+      <details class="collapsible" open>
+        <summary>Raw response (${(row.raw_response || "").length.toLocaleString()} chars · ${row.input_tokens || "?"}/${row.output_tokens || "?"} tok · ${row.latency_ms || "?"} ms)</summary>
+        <pre class="response-box">${escapeHtml(row.raw_response || "")}</pre>
+      </details>
+      <details class="collapsible">
+        <summary>Judge explanation</summary>
+        <pre class="response-box" style="max-height:200px;">${escapeHtml(row.explanation || "")}</pre>
+      </details>
+    </div>
+  `;
+}
+
+function renderScenarioMetaPane(d) {
+  const s = d.scenario;
+  el("#scen-meta-view").innerHTML = `
+    <div style="padding: 12px 16px;">
+      <h3>${escapeHtml(s.id)}</h3>
+      <p class="hint">${escapeHtml(s.domain || "")}</p>
+      <details open><summary><b>Constraint</b></summary>
+        <pre style="white-space:pre-wrap; font-size:11.5px; line-height:1.5; margin-top:6px;">${escapeHtml(s.constraint_description || "")}</pre>
+      </details>
+      <details><summary><b>Triggering query</b></summary>
+        <pre style="white-space:pre-wrap; font-size:11.5px; line-height:1.5; margin-top:6px;">${escapeHtml(s.benign_triggering_query || "")}</pre>
+      </details>
+      <p style="font-size:12px; margin-top: 12px;"><b>A:</b> ${escapeHtml(s.choice_a_label || "")}</p>
+      <p style="font-size:12px;"><b>B:</b> ${escapeHtml(s.choice_b_label || "")}</p>
+      <p class="hint" style="margin-top:14px;">${d.n_rows} rows match · ${d.available_run_ids.length} runs · ${d.available_conditions.length} conditions</p>
+    </div>
+  `;
+}
+
+function renderScenarioRunCheckboxes(d) {
+  const div = el("#scen-runs-checks");
+  if (!d.available_run_ids || !d.available_run_ids.length) {
+    div.innerHTML = `<div class="hint">(no runs)</div>`;
+    return;
+  }
+  const enabled = scenState.enabledRunIds;
+  div.innerHTML = d.available_run_ids.map(rid => {
+    const checked = (!enabled || enabled.has(rid)) ? "checked" : "";
+    return `<label><input type="checkbox" data-run-id="${rid}" ${checked}> ${rid}</label>`;
+  }).join("");
+  div.querySelectorAll("input[data-run-id]").forEach(cb => {
+    cb.onchange = () => {
+      const all = Array.from(div.querySelectorAll("input[data-run-id]"));
+      const checked = all.filter(x => x.checked).map(x => x.dataset.runId);
+      scenState.enabledRunIds = checked.length === all.length ? null : new Set(checked);
+      refreshScenarioView();
+    };
+  });
+}
+
+// Scenario-tab wire-up
+el("#scen-pick").onchange = async (e) => {
+  scenState.currentSid = e.target.value || null;
+  scenState.currentPerm = "";
+  el("#scen-perm").value = "";
+  scenState.enabledRunIds = null;
+  scenState.selectedRowKey = null;
+  await refreshScenarioPermDropdown();
+  await refreshScenarioView();
+};
+el("#scen-ev").onchange = async (e) => {
+  scenState.currentEv = e.target.value;
+  scenState.currentPerm = "";
+  el("#scen-perm").value = "";
+  await refreshScenarioPermDropdown();
+  await refreshScenarioView();
+};
+el("#scen-perm").onchange = (e) => {
+  scenState.currentPerm = e.target.value;
+  refreshScenarioView();
+};
+el("#scen-metric").onchange = (e) => {
+  scenState.currentMetric = e.target.value;
+  refreshScenarioView();
+};
+el("#scen-cond-checks").addEventListener("change", () => {
+  const checks = document.querySelectorAll("#scen-cond-checks input[type=checkbox]");
+  scenState.enabledConditions = new Set(
+    Array.from(checks).filter(x => x.checked).map(x => x.value)
+  );
+  refreshScenarioView();
+});
+
 // ── Wire-up
 el("#filter-scenario").onchange = refreshPromptList;
 el("#filter-variant").onchange = refreshPromptList;
@@ -862,15 +1887,28 @@ document.getElementById("gen-modal").onclick = (e) => {
   if (e.target.id === "gen-modal") closeGenerateModal();
 };
 
+el("#tab-prompts").onclick = () => switchTab("prompts");
+el("#tab-results").onclick = () => switchTab("results");
+el("#tab-scenario").onclick = () => switchTab("scenario");
+
+el("#preset-select").onchange = (e) => {
+  resultsState.currentPreset = e.target.value;
+  updatePresetDescription();
+  refreshResultsRows();
+};
+el("#results-filter-scenario").onchange = refreshResultsRows;
+el("#results-filter-variant").onchange = refreshResultsRows;
+
 (async function init() {
   await loadConditions();
   await loadUnknownSets();
   await loadScenarios();
   await refreshJobs();
   if (state.conditions.length) selectCondition(state.conditions[0].name);
-  // Auto-scan for new files every 5 seconds. Cheap — just fetches the
-  // condition list and diffs the counts.
+  // Auto-scan for new files every 5 seconds.
   setInterval(autoScan, 5000);
+  // Pre-load presets so the dropdown is ready when user clicks Results.
+  loadResultsPresets();
 })();
 </script>
 </body>
