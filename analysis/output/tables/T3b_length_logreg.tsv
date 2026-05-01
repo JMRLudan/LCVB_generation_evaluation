@@ -1,0 +1,4 @@
+model	spec	intercept	se_intercept	slope_per_decade	se_slope	slope_ci_lo	slope_ci_hi	x_mean_log10_chars	n_rows
+claude-haiku-4-5-20251001	SR ~ log10(char_budget)	-0.5561	0.0298	-0.4415	0.0543	-0.5479	-0.3351	4.4393	4936
+claude-opus-4-7	SR ~ log10(char_budget)	1.4952	0.0370	-0.2956	0.0670	-0.4270	-0.1643	4.4392	4935
+claude-sonnet-4-6	SR ~ log10(char_budget)	0.7393	0.0306	-0.3091	0.0555	-0.4180	-0.2002	4.4399	4928

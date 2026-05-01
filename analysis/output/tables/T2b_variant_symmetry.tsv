@@ -1,0 +1,4 @@
+model	n_scenarios	mean(SR_AC - SR_BC)	median	stdev	min	max
+claude-haiku-4-5-20251001	85	-0.0010	0.0000	0.1144	-0.2963	0.2222
+claude-opus-4-7	85	0.0210	0.0000	0.1395	-0.4074	0.5833
+claude-sonnet-4-6	85	0.0352	0.0000	0.1604	-0.2963	0.5185

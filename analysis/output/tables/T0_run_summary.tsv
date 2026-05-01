@@ -1,0 +1,6 @@
+model	preset	run_id	n_total	n_ok	source	tsv_path
+claude-haiku-4-5-20251001	canon_direct	canon_haiku_20260501_070006	2122	2122	archive	data/archive_canon_direct_20260501/runs/claude-haiku-4-5-20251001/canon_haiku_20260501_070006/results.tsv
+claude-haiku-4-5-20251001	canon_no_distractor	canon_haiku_20260501_070006	2122	2122	archive	data/archive_canon_no_distractor_20260501/runs/claude-haiku-4-5-20251001/canon_haiku_20260501_070006/results.tsv
+claude-haiku-4-5-20251001	canon_unified	canon_haiku_20260501_070006	6366	6366	live	data/runs/canon_unified/claude-haiku-4-5-20251001/canon_haiku_20260501_070006/results.tsv
+claude-opus-4-7	canon_unified	canon_opus_20260501_175100	6366	6366	live	data/runs/canon_unified/claude-opus-4-7/canon_opus_20260501_175100/results.tsv
+claude-sonnet-4-6	canon_unified	canon_sonnet_20260501_174726	6366	6366	live	data/runs/canon_unified/claude-sonnet-4-6/canon_sonnet_20260501_174726/results.tsv

@@ -22,6 +22,7 @@ top-level README under "Generation and stitching rules"):
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -34,7 +35,45 @@ TURN_LINE_OVERHEAD = 40
 # Default seed-ack text pool. Kept deliberately neutral — very short or
 # overly-casual acks ("Got it.", "I see.") were dropped because they can
 # read as dismissive of the evidence content.
-DEFAULT_ACKS = ["Thanks for sharing that.", "Understood.", "Noted."]
+DEFAULT_ACKS = [
+    "Thanks for sharing that.",
+    "Understood.",
+    "Noted.",
+    "Got it.",
+    "OK, makes sense.",
+    "Mm, alright.",
+]
+
+# Picked by sha256-derived row key in evidence_pairs_from_seeds.
+EVIDENCE_PREFIXES = [
+    "Just wanted to randomly say this, a short acknowledgement would suffice — ",
+    "Another random note, just acknowledge and move on — ",
+    "Quick aside about me, no need to elaborate — ",
+    "Just sharing this for context, brief acknowledgement is fine — ",
+]
+
+# Picked by sha256-derived row key in assemble_at_pair_boundary.
+RESUMPTION_PREFIXES = [
+    "Going back to earlier — ",
+    "Resuming the earlier topic — ",
+    "Anyway, picking back up — ",
+    "Back to what we were discussing — ",
+]
+
+# NOTE: We deliberately do NOT emit any chat-boundary marker between
+# stitched distractor chunks. The pool itself is 99 pre-assembled
+# conversations (see JOURNAL.md 2026-05-01 — distractor pool audit), so
+# inserting a divider only at our concat seams while leaving the pool's
+# internal stitch points unmarked would assert a topology we don't have.
+# The reader sees the merged stream as one ongoing log, which matches
+# what we actually know about it.
+
+
+def _stable_index(parts: Sequence[str], n: int) -> int:
+    """Deterministic index in [0, n) from sha256 of joined parts.
+    Same key → same index, across processes and machines."""
+    h = hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()[:16]
+    return int(h, 16) % n
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -74,24 +113,18 @@ def _pair_char_cost(pair: Sequence[Dict]) -> int:
 def truncate_pairs_to_budget(
     pairs: Sequence[List[Dict]], char_budget: int
 ) -> List[List[Dict]]:
-    """Keep a contiguous prefix of pairs that fits within `char_budget`.
-
-    Iterates from index 0 forward. Stops adding pairs as soon as the
-    next pair would push the running char count over the budget.
-    The tail is dropped.
-
-    This is the ONLY truncation direction allowed in this repo — see
-    the project memory entry "Distractor conversation construction rules"
-    and the README "Generation and stitching rules" section.
+    """Keep a contiguous prefix of pairs whose total chars meets or just
+    exceeds ``char_budget`` (budget = floor, not ceiling). Direction is
+    keep-beginning; the pair that crosses the threshold is the last one
+    kept. If the whole list fits under the budget, all pairs are kept.
     """
     kept: List[List[Dict]] = []
     running = 0
     for p in pairs:
-        cost = _pair_char_cost(p)
-        if running + cost > char_budget:
-            break
         kept.append(p)
-        running += cost
+        running += _pair_char_cost(p)
+        if running >= char_budget:
+            break
     return kept
 
 
@@ -130,7 +163,7 @@ def merge_distractor_turn_lists(
         return []
     merged: List[Dict] = []
     prev_end: Optional[datetime] = None
-    for tl in turn_lists:
+    for chat_idx, tl in enumerate(turn_lists):
         copied = [dict(t) for t in tl]
         if not copied:
             continue
@@ -153,20 +186,44 @@ def merge_distractor_turn_lists(
 # Evidence pair formatting
 # ──────────────────────────────────────────────────────────────────────
 def evidence_pairs_from_seeds(
-    seeds: Sequence[str], acks: Sequence[str] = DEFAULT_ACKS
+    seeds: Sequence[str],
+    acks: Sequence[str] = DEFAULT_ACKS,
+    row_key: Sequence[str] = (),
 ) -> List[List[Dict]]:
-    """Turn evidence seed strings into [user_seed, assistant_ack] pairs.
+    """Turn evidence seeds into [user_seed, assistant_ack] pairs.
 
-    Timestamps are left None and filled in later by the assembler
-    once the insertion point is known.
+    Each user turn gets an EVIDENCE_PREFIXES prefix; ack turn gets one
+    from `acks`. With `row_key`, both selections are sha256-rotated per
+    (row, slot) so different rows surface different combinations, and
+    every slot in the row gets a distinct prefix (independent hash with
+    collision-bump → full N×(N-1) ordered-pair coverage when len ≥ N).
+    Empty `row_key` falls back to position-based cycling.
+
+    Timestamps are filled in by the assembler once placement is known.
     """
+    n_pre = len(EVIDENCE_PREFIXES)
+    n_ack = len(acks)
     pairs: List[List[Dict]] = []
+    used_prefixes: set = set()
     for i, seed in enumerate(seeds):
-        user_turn = {"timestamp": None, "role": "user", "content": seed}
+        if row_key:
+            idx = _stable_index(("evidence_prefix",) + tuple(row_key) + (str(i),), n_pre)
+            while idx in used_prefixes:
+                idx = (idx + 1) % n_pre
+            used_prefixes.add(idx)
+            ack_idx = _stable_index(("ack",) + tuple(row_key) + (str(i),), n_ack)
+        else:
+            idx = i % n_pre
+            ack_idx = i % n_ack
+        user_turn = {
+            "timestamp": None,
+            "role": "user",
+            "content": EVIDENCE_PREFIXES[idx] + seed,
+        }
         ack_turn = {
             "timestamp": None,
             "role": "assistant",
-            "content": acks[i % len(acks)],
+            "content": acks[ack_idx],
         }
         pairs.append([user_turn, ack_turn])
     return pairs
@@ -209,63 +266,103 @@ def interpolate_timestamp(
 def assemble_at_pair_boundary(
     distractor_pairs: Sequence[List[Dict]],
     evidence_pairs: Sequence[List[Dict]],
-    placement_frac: float,
-) -> Tuple[List[Dict], int, int]:
-    """Insert evidence pairs at a pair-boundary chosen by placement_frac.
+    placement_fracs: Sequence[float],
+    row_key: Sequence[str] = (),
+) -> Tuple[List[Dict], List[int], int]:
+    """Insert each evidence pair at its own pair-boundary position.
 
     Args:
-        distractor_pairs: pair units from the (already truncated)
-            distractor conversation.
-        evidence_pairs: pair units that hold the evidence seeds + acks.
-        placement_frac: where in the distractor pair sequence to insert,
-            normalized to [0, 1]. `0.0` → evidence at the very top;
-            `1.0` → evidence at the very end, immediately before the new
-            user query. The value is clamped to the valid range and
-            snapped to the nearest pair index.
+        distractor_pairs: pair units from the (already truncated) distractor.
+        evidence_pairs: pair units holding the evidence seeds + acks.
+        placement_fracs: per-pair insertion depths in [0, 1] — same length as
+            evidence_pairs. Each frac is clamped and snapped to the nearest
+            pair boundary independently. Pairs at the same snapped index
+            merge into one block (preserving evidence_pairs order).
 
     Returns:
-        (combined_flat_turn_list, insert_pair_idx, n_distractor_pairs)
+        (flat_turn_list, insert_pair_idxs, n_distractor_pairs) where
+        insert_pair_idxs lines up with evidence_pairs (one snapped index
+        per evidence pair).
 
-    By construction the returned turn list starts on a user turn,
-    ends on an assistant turn, and alternates strictly.
+    By construction the returned turn list starts on a user turn, ends on
+    an assistant turn, and alternates strictly.
     """
+    if len(placement_fracs) != len(evidence_pairs):
+        raise ValueError(
+            f"placement_fracs has {len(placement_fracs)} entries but "
+            f"evidence_pairs has {len(evidence_pairs)}"
+        )
+
     n_pairs = len(distractor_pairs)
-    insert_pair_idx = int(round(placement_frac * n_pairs))
-    insert_pair_idx = max(0, min(n_pairs, insert_pair_idx))
+    insert_pair_idxs = [
+        max(0, min(n_pairs, int(round(p * n_pairs)))) for p in placement_fracs
+    ]
 
-    # Timestamp anchors: last turn of the previous pair; first turn of the
-    # following pair.
-    ts_before = None
-    ts_after = None
-    if insert_pair_idx > 0:
-        ts_before = distractor_pairs[insert_pair_idx - 1][-1]["timestamp"]
-    if insert_pair_idx < n_pairs:
-        ts_after = distractor_pairs[insert_pair_idx][0]["timestamp"]
+    # Group evidence pairs by their snapped insert index so colliding pairs
+    # (same index) merge into one block. Stable sort preserves the order
+    # of evidence_pairs within a tie.
+    blocks_at: Dict[int, List[List[Dict]]] = {}
+    sorted_ev = sorted(
+        range(len(evidence_pairs)),
+        key=lambda i: (insert_pair_idxs[i], i),
+    )
+    for ev_i in sorted_ev:
+        blocks_at.setdefault(insert_pair_idxs[ev_i], []).append(evidence_pairs[ev_i])
 
-    n_ev_turns = sum(len(p) for p in evidence_pairs)
-    offset = 0
-    for pair in evidence_pairs:
-        for turn in pair:
-            turn["timestamp"] = interpolate_timestamp(
-                ts_before, ts_after, offset, n_ev_turns
-            )
-            offset += 1
-
+    n_resume = len(RESUMPTION_PREFIXES)
     flat: List[Dict] = []
-    for p in distractor_pairs[:insert_pair_idx]:
-        flat.extend(p)
-    for p in evidence_pairs:
-        flat.extend(p)
-    for p in distractor_pairs[insert_pair_idx:]:
-        flat.extend(p)
-    return flat, insert_pair_idx, n_pairs
+    used_resumes: set = set()
+    block_seq = 0
+    for i in range(n_pairs + 1):
+        if i in blocks_at:
+            block_pairs = blocks_at[i]
+            ts_before = distractor_pairs[i - 1][-1]["timestamp"] if i > 0 else None
+            ts_after = distractor_pairs[i][0]["timestamp"] if i < n_pairs else None
+            n_block_turns = sum(len(p) for p in block_pairs)
+            offset = 0
+            for ev_pair in block_pairs:
+                for turn in ev_pair:
+                    turn["timestamp"] = interpolate_timestamp(
+                        ts_before, ts_after, offset, n_block_turns
+                    )
+                    offset += 1
+                flat.extend(ev_pair)
+            # Resumption prefix on the first user turn after this block.
+            # Skipped at the very end of the haystack (no following turn)
+            # AND at the very start (i == 0 means the "following" turn is
+            # the conversation's first user message — there's no earlier
+            # topic to go back to).
+            if 0 < i < n_pairs:
+                following = distractor_pairs[i]
+                if following and following[0].get("role") == "user":
+                    if row_key:
+                        idx = _stable_index(
+                            ("resumption_prefix",) + tuple(row_key) + (str(block_seq),),
+                            n_resume,
+                        )
+                        while idx in used_resumes:
+                            idx = (idx + 1) % n_resume
+                        used_resumes.add(idx)
+                    else:
+                        idx = block_seq % n_resume
+                    following[0]["content"] = (
+                        RESUMPTION_PREFIXES[idx]
+                        + str(following[0].get("content", ""))
+                    )
+            block_seq += 1
+        if i < n_pairs:
+            flat.extend(distractor_pairs[i])
+
+    return flat, insert_pair_idxs, n_pairs
 
 
 # ──────────────────────────────────────────────────────────────────────
 # Rendering to text
 # ──────────────────────────────────────────────────────────────────────
 def turns_to_text(turns: Sequence[Dict]) -> str:
-    """Format a flat turn list as `[timestamp] Role: content` lines."""
+    """Format a flat turn list as `[timestamp] Role: content` lines.
+    No chat-boundary divider is emitted between stitched chunks — see
+    the module-level comment near the prefix tables."""
     lines = []
     for t in turns:
         role_label = "User" if t["role"] == "user" else "Assistant"

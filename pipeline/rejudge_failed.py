@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 csv.field_size_limit(sys.maxsize)
 
-from eval_pipeline import load_scenarios, SCENARIOS_TSV, score_result, get_seeds_by_indices, enumerate_permutations  # noqa: E402
+from eval_pipeline import load_scenarios, SCENARIOS_TSV, score_result, get_constraint_grounding_seeds, enumerate_permutations  # noqa: E402
 import eval_pipeline  # noqa: E402  (writeable JUDGE_MODE attribute)
 from openrouter_client import OpenRouterClient  # noqa: E402
 from multi_model_runner import judge_response, JUDGE_MODEL  # noqa: E402
@@ -47,9 +47,7 @@ RUNS_DIR = BASE_DIR / "data" / "runs"
 CANON_PRESETS = [
     "canon_direct",
     "canon_no_distractor",
-    "canon_uniform_short",
-    "canon_uniform_medium",
-    "canon_uniform_long",
+    "canon_unified",
 ]
 
 
@@ -81,8 +79,8 @@ def apply_judge_result(row: dict, parsed: dict, expected: str) -> None:
     row["constraint_mentioned"] = parsed.get("constraint_mentioned") or ""
     row["heavily_modified"] = parsed.get("heavily_modified") or ""
     # Only present in with_analysis mode; left blank in pure_eval.
-    if "cited_user_info" in row or parsed.get("cited_user_info") is not None:
-        row["cited_user_info"] = parsed.get("cited_user_info") or ""
+    if "mentions_user_evidence" in row or parsed.get("mentions_user_evidence") is not None:
+        row["mentions_user_evidence"] = parsed.get("mentions_user_evidence") or ""
     row["explanation"] = (parsed.get("explanation") or "").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
     pe = parsed.get("parse_error", False)
     row["parse_error"] = "1" if pe else "0"
@@ -123,18 +121,18 @@ async def rejudge_preset(
         fieldnames = reader.fieldnames or []
         rows = list(reader)
 
-    # Auto-add the cited_user_info column when running in with_analysis mode
-    # so DictWriter doesn't drop the new field. Insert it after heavily_modified
-    # to match the EvalResult dataclass ordering.
-    if eval_pipeline.JUDGE_MODE == "with_analysis" and "cited_user_info" not in fieldnames:
+    # In with_analysis mode, ensure the mentions_user_evidence column
+    # exists so DictWriter doesn't drop the field when an older TSV
+    # didn't have it (e.g. one judged in pure_eval mode).
+    if eval_pipeline.JUDGE_MODE == "with_analysis" and "mentions_user_evidence" not in fieldnames:
+        fieldnames = list(fieldnames)
         try:
             insert_at = fieldnames.index("heavily_modified") + 1
         except ValueError:
             insert_at = len(fieldnames)
-        fieldnames = list(fieldnames)
-        fieldnames.insert(insert_at, "cited_user_info")
+        fieldnames.insert(insert_at, "mentions_user_evidence")
         for r in rows:
-            r.setdefault("cited_user_info", "")
+            r.setdefault("mentions_user_evidence", "")
 
     if include_all:
         failed = [r for r in rows
@@ -175,7 +173,10 @@ async def rejudge_preset(
             if perm_l == perm_label:
                 seed_indices = idx
                 break
-        evidence_seeds = get_seeds_by_indices(scenario, variant, seed_indices) if seed_indices else []
+        # Pass only the C-side seed to the judge (constraint-grounding fact).
+        # MUE then measures surfacing of the constraint-relevant user fact,
+        # not any user fact. For A/B (no-C) variants this list is empty.
+        evidence_seeds = get_constraint_grounding_seeds(scenario, variant, seed_indices) if seed_indices else []
 
         # Unescape raw_response (run.py escapes \n \r \t for TSV safety; judge prompt
         # should see the real response).
@@ -267,7 +268,7 @@ def main() -> int:
         help=(
             "Re-judge every row whose subject succeeded (instead of only "
             "parse_error=1 rows). Use with --judge-mode with_analysis to "
-            "populate cited_user_info on a previously pure_eval'd run."
+            "populate mentions_user_evidence on a previously pure_eval'd run."
         ),
     )
     ap.add_argument(

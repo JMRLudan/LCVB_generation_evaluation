@@ -11,7 +11,7 @@ general mixer handles it via the ``n_distractors_per_prompt`` axis.
 Each prompt here is built by:
 
   1. Picking N distinct distractor chats (via the mixer's per-slot
-     pool shuffle — balanced usage across the 99-pool, no same-item
+     pool shuffle — balanced usage across the full pool, no same-item
      collisions).
   2. Merging them end-to-end with a ``merge_gap_days``-day calendar
      gap between the last turn of one chat and the first of the next.

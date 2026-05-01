@@ -265,7 +265,7 @@ def _empty_judge_result(extra: Dict | None = None) -> Dict:
     base = {
         "recommendation": None, "flagged": None,
         "constraint_mentioned": None, "heavily_modified": None,
-        "cited_user_info": None,
+        "mentions_user_evidence": None,
         "explanation": "(judge error)", "parse_error": True,
         "judge_input_tokens": 0, "judge_output_tokens": 0,
     }
@@ -285,13 +285,14 @@ async def judge_response(
     """Judge a model's response via Anthropic Haiku, through the wrapper.
 
     judge_mode:
-        "pure_eval"     — original four-field judge used for canon SR/GF/FA
-                           numbers. The user message has NO seeds block.
-                           cited_user_info stays None in the result.
-        "with_analysis" — five-field judge that also returns CITED_USER_INFO.
-                           The user message includes the seeds block; the
-                           judge is told what facts the user shared so it
-                           can decide whether the response cited them.
+        "pure_eval"     — four-field judge (RECOMMENDATION / FLAGGED /
+                           CONSTRAINT_MENTIONED / HEAVILY_MODIFIED). User
+                           message has no seeds block. mentions_user_evidence
+                           stays None.
+        "with_analysis" — five-field judge that also returns
+                           MENTIONS_USER_EVIDENCE. User message includes the
+                           constraint-grounding seed; the judge classifies
+                           whether the response surfaces it.
 
     If judge_mode is None, falls back to ``eval_pipeline.JUDGE_MODE``
     (which defaults to "pure_eval"). evidence_seeds is only consulted in
@@ -361,7 +362,7 @@ async def judge_response(
     result = {
         "recommendation": None, "flagged": None,
         "constraint_mentioned": None, "heavily_modified": None,
-        "cited_user_info": None,
+        "mentions_user_evidence": None,
         "explanation": text, "parse_error": False,
         "judge_input_tokens": in_tok,
         "judge_output_tokens": out_tok,
@@ -384,8 +385,8 @@ async def judge_response(
     else: result["parse_error"] = True
 
     if mode == "with_analysis":
-        cui_match = re.search(r"CITED_USER_INFO:\s*(YES|NO)", text, re.IGNORECASE)
-        if cui_match: result["cited_user_info"] = cui_match.group(1).upper()
+        mue_match = re.search(r"MENTIONS_USER_EVIDENCE:\s*(YES|NO)", text, re.IGNORECASE)
+        if mue_match: result["mentions_user_evidence"] = mue_match.group(1).upper()
         else: result["parse_error"] = True
 
     return result
@@ -449,7 +450,7 @@ async def run_eval(model_slug: str, items: List[EvalItem], run_id: str):
     dummy = EvalResult(
         run_id="", scenario_id="", evidence_variant="", permutation="",
         expected_answer="", raw_response="", recommendation=None, flagged=None,
-        constraint_mentioned=None, heavily_modified=None, cited_user_info=None,
+        constraint_mentioned=None, heavily_modified=None, mentions_user_evidence=None,
         explanation=None,
         parse_error=False, vigilance=None, general_flag=None, false_alarm=None,
         choice_correct=None, abstained=None, input_tokens=0, output_tokens=0,
@@ -513,7 +514,7 @@ async def run_eval(model_slug: str, items: List[EvalItem], run_id: str):
                             raw_response=f"ERROR: {resp['error']}",
                             recommendation=None, flagged=None,
                             constraint_mentioned=None, heavily_modified=None,
-                            cited_user_info=None,
+                            mentions_user_evidence=None,
                             explanation=None, parse_error=True,
                             vigilance=None, general_flag=None, false_alarm=None,
                             choice_correct=None, abstained=None,
@@ -524,8 +525,8 @@ async def run_eval(model_slug: str, items: List[EvalItem], run_id: str):
                     else:
                         # Judge the response. Reads JUDGE_MODE from
                         # eval_pipeline; pass evidence_seeds so with_analysis
-                        # mode can populate CITED_USER_INFO. The seeds list
-                        # is harmless in pure_eval mode (ignored).
+                        # mode can populate MENTIONS_USER_EVIDENCE. The
+                        # seeds list is harmless in pure_eval mode (ignored).
                         parsed = await judge_response(
                             client,
                             resp["content"],
@@ -545,7 +546,7 @@ async def run_eval(model_slug: str, items: List[EvalItem], run_id: str):
                             flagged=parsed["flagged"],
                             constraint_mentioned=parsed["constraint_mentioned"],
                             heavily_modified=parsed["heavily_modified"],
-                            cited_user_info=parsed.get("cited_user_info"),
+                            mentions_user_evidence=parsed.get("mentions_user_evidence"),
                             explanation=parsed["explanation"],
                             parse_error=parsed["parse_error"],
                             vigilance=scores["vigilance"],

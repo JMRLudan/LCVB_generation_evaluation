@@ -1,13 +1,20 @@
 {
-  "version": "1.0",
-  "generated_at": "2026-04-21T00:34:40.337519+00:00",
+  "version": "2.0",
+  "generated_at": "2026-05-01T16:22:13.932567+00:00",
   "source_files": [
-    "data/distractor_turns.json",
-    "data/stitched_full_length_scenarios_top_first.csv"
+    "data/distractor_turns.json"
   ],
-  "total_unique_groups": 99,
+  "contamination_filter_applied": true,
+  "contaminated_hashes_dropped": [
+    "332627944e32",
+    "a279c1232fff",
+    "ad42a863326b",
+    "c159cbddf7f9",
+    "c822d2a17b5d"
+  ],
+  "total_unique_groups": 94,
   "total_source_groups": 475,
-  "dedup_ratio": 0.208421,
+  "dedup_ratio": 0.197895,
   "groups": [
     {
       "distractor_hash": "014335d0db9f",
@@ -580,16 +587,6 @@
       "num_references": 5
     },
     {
-      "distractor_hash": "ad42a863326b",
-      "distractor_domain": "Literary Analysis",
-      "num_turns": 572,
-      "num_user_turns": 286,
-      "referencing_scenarios": [
-        "DM-03"
-      ],
-      "num_references": 5
-    },
-    {
       "distractor_hash": "ad6307e437c9",
       "distractor_domain": "Cooking Technique",
       "num_turns": 485,
@@ -958,46 +955,6 @@
         "PY-01"
       ],
       "num_references": 4
-    },
-    {
-      "distractor_hash": "332627944e32",
-      "distractor_domain": "Philosophy/Logic",
-      "num_turns": 588,
-      "num_user_turns": 294,
-      "referencing_scenarios": [
-        "PY-01"
-      ],
-      "num_references": 1
-    },
-    {
-      "distractor_hash": "a279c1232fff",
-      "distractor_domain": "Music/Audio",
-      "num_turns": 373,
-      "num_user_turns": 187,
-      "referencing_scenarios": [
-        "CD-01"
-      ],
-      "num_references": 1
-    },
-    {
-      "distractor_hash": "c159cbddf7f9",
-      "distractor_domain": "Music/Audio",
-      "num_turns": 331,
-      "num_user_turns": 166,
-      "referencing_scenarios": [
-        "HS-03"
-      ],
-      "num_references": 1
-    },
-    {
-      "distractor_hash": "c822d2a17b5d",
-      "distractor_domain": "Language Learning",
-      "num_turns": 572,
-      "num_user_turns": 286,
-      "referencing_scenarios": [
-        "CT-02"
-      ],
-      "num_references": 1
     }
   ]
 }

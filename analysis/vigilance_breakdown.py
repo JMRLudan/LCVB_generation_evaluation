@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """
-Vigilance (SR) breakdown for LCVB canon run on Haiku 4.5 across 5 presets.
-
-Presets:
-  canon_direct, canon_no_distractor, canon_uniform_short, canon_uniform_medium, canon_uniform_long
-
-Outputs: markdown tables to analysis/vigilance_breakdown.md
+Vigilance (SR) breakdown for LCVB canon run.
+Presets: canon_direct, canon_no_distractor, canon_unified.
+Outputs: markdown tables to analysis/vigilance_breakdown.md.
 """
 from __future__ import annotations
 import json
@@ -27,14 +24,8 @@ GEN = BASE / "generated"
 MODEL = "claude-haiku-4-5-20251001"
 RID = os.environ.get("LCVB_RID", "20260424_182110")
 
-PRESETS = [
-    "canon_direct",
-    "canon_no_distractor",
-    "canon_uniform_short",
-    "canon_uniform_medium",
-    "canon_uniform_long",
-]
-UNIFORM_PRESETS = [p for p in PRESETS if p.startswith("canon_uniform_")]
+PRESETS = ["canon_direct", "canon_no_distractor", "canon_unified"]
+UNIFORM_PRESETS = ["canon_unified"]  # with-distractor; sliced for depth-curve / 2D-surface analyses.
 
 OUT_MD = Path(__file__).resolve().parent / "vigilance_breakdown.md"
 
@@ -228,18 +219,17 @@ for p in PRESETS:
         dom_flat[f"n_{p}"] = dom_tab[("size", p)]
 dom_flat = dom_flat.reset_index()
 
-# counts of domains with SR > .8 on each "ceiling" and SR < .2 on long
-ceiling_preset = "canon_direct"
-long_preset = "canon_uniform_long"
-ceil_col = f"SR_{ceiling_preset}"
-long_col = f"SR_{long_preset}"
+# SR drop direct → with-distractor per domain.
+ceil_col = "SR_canon_direct"
+distractor_col = "SR_canon_unified"
 n_ceil_high = int((dom_flat[ceil_col] > 0.80).sum()) if ceil_col in dom_flat else 0
-n_long_low = int((dom_flat[long_col] < 0.20).sum()) if long_col in dom_flat else 0
-# Compute SR drop direct -> long per domain
-if ceil_col in dom_flat and long_col in dom_flat:
-    dom_flat["drop_direct_to_long"] = dom_flat[ceil_col] - dom_flat[long_col]
-# Sort by drop
-dom_flat_sorted = dom_flat.sort_values("drop_direct_to_long", ascending=False)
+n_long_low = int((dom_flat[distractor_col] < 0.20).sum()) if distractor_col in dom_flat else 0
+if ceil_col in dom_flat and distractor_col in dom_flat:
+    dom_flat["drop_direct_to_distractor"] = dom_flat[ceil_col] - dom_flat[distractor_col]
+    sort_col = "drop_direct_to_distractor"
+else:
+    sort_col = ceil_col if ceil_col in dom_flat else dom_flat.columns[0]
+dom_flat_sorted = dom_flat.sort_values(sort_col, ascending=False)
 
 # ---------------------------------------------------------------------------
 # (2) By risk tier

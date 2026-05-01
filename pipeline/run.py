@@ -324,12 +324,13 @@ def main():
         choices=["pure_eval", "with_analysis"],
         default=None,
         help=(
-            "Which judge prompt to use. 'pure_eval' (default) is the "
-            "original 4-field schema used for the canon SR/GF/FA numbers. "
-            "'with_analysis' adds the CITED_USER_INFO diagnostic field "
-            "(judge sees the user's stated facts and decides whether the "
-            "model referred back to them). New runs in with_analysis mode "
-            "populate the cited_user_info column; pure_eval leaves it blank."
+            "Which judge prompt to use. Omit to use the global "
+            "eval_pipeline.JUDGE_MODE (currently 'pure_eval'). "
+            "'pure_eval' is the 4-field schema (recommendation/flagged/"
+            "constraint_mentioned/heavily_modified). 'with_analysis' adds "
+            "MENTIONS_USER_EVIDENCE — the judge sees the constraint-grounding "
+            "seed and decides whether the response surfaced it. with_analysis "
+            "populates the mentions_user_evidence column; pure_eval leaves it blank."
         ),
     )
     ap.add_argument("--run", action="store_true",

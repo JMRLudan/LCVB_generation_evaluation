@@ -1,0 +1,6 @@
+model	preset	n_total	n_ok	subject_in_tokens	subject_out_tokens	judge_in_tokens	judge_out_tokens	subject_in_cost_usd	subject_out_cost_usd	judge_in_cost_usd	judge_out_cost_usd	total_cost_usd
+claude-haiku-4-5-20251001	canon_unified	6366	6366	96635467	2045581	7081930	251528	48.3177	5.1140	3.5410	0.6288	57.6015
+claude-opus-4-7	canon_unified	6366	6366	133364671	4193329	8023560	252079	66.6823	10.4833	4.0118	0.6302	81.8076
+claude-sonnet-4-6	canon_unified	6366	6366	96631308	2121666	7158960	252733	48.3157	5.3042	3.5795	0.6318	57.8311
+claude-haiku-4-5-20251001	canon_direct	2122	2122	859116	752579	2431663	84707	0.4296	1.8814	1.2158	0.2118	3.7386
+claude-haiku-4-5-20251001	canon_no_distractor	2122	2122	408199	614951	2294036	83594	0.2041	1.5374	1.1470	0.2090	3.0975

@@ -34,9 +34,10 @@ Randomization invariants
   the exact same output bytes. Changing ``seed`` reshuffles
   distractor assignments and placement jitter.
 * **Balanced distractor usage.** Within a single draw index, the
-  99-hash pool is shuffled with ``Random(seed + draw_idx)`` and
-  assigned round-robin over items. Every distractor is used
-  ⌈N/99⌉ or ⌊N/99⌋ times per draw — maximally uniform.
+  full pool (``P = len(pool)``, currently 96) is shuffled with
+  ``Random(seed + draw_idx)`` and assigned round-robin over items.
+  Every distractor is used ⌈N/P⌉ or ⌊N/P⌋ times per draw —
+  maximally uniform.
 * **Per-item distractor constancy.** Within one ``(sid, variant,
   perm, draw_idx)`` the distractor is fixed, so every (length,
   placement) cell shares it. With ``n_distractor_draws=k > 1`` you
@@ -48,23 +49,44 @@ Randomization invariants
   deterministically inside its bin. Large N ⇒ uniform coverage per
   item; many items ⇒ uniform coverage across the set.
 
+Length axis modes
+-----------------
+
+* ``length_mode="fixed"`` (default) — the historical behavior; lengths
+  come from ``lengths_named`` / ``lengths_list`` and ``n_lengths``
+  iterates over them as a discrete axis.
+* ``length_mode="log_uniform_stratified"`` — char budget is sampled
+  per cell on a log-uniform scale over ``length_range=(min, max)``,
+  with stratification within each scenario (mirror of
+  ``placement_mode="uniform_stratified"`` on the depth axis). Used by
+  the unified canon, where each row gets its own (length, depth) pair
+  rather than living on a fixed-length tier.
+
 Canonical wrappers
 ------------------
 
 * ``render_with_constraint``  →
-  ``mix(n_d=0, n_p=0, n_l=0, include_constraint_inline=True)``
+  ``mix(n_d=0, n_p=0, n_l=0, include_constraint_inline=True,
+        c_only=False)``
 * ``render_no_distractor``    →
-  ``mix(n_d=0, n_p=0, n_l=0, include_constraint_inline=False)``
+  ``mix(n_d=0, n_p=0, n_l=0, include_constraint_inline=False,
+        c_only=False)``
+* ``render_unified``          →
+  ``mix(n_d=3, n_distractors_per_prompt=3, n_p=1, n_l=1,
+        placement_mode="uniform_stratified",
+        length_mode="log_uniform_stratified",
+        length_range=(3000, 250000),
+        c_only=False)``
 * ``render_fixed_locations``  →
   ``mix(n_d=1, n_p=5, n_l=2, placement_mode="fixed",
         placements_list=(0, .25, .5, .75, 1),
-        lengths_named={"short": 24000, "long": 224000})``
+        lengths_named={"short": 24000, "long": 224000})``  (non-canon, ablation)
 * ``render_continuous_random`` →
   ``mix(n_d=1, n_p=1, n_l=1, placement_mode="uniform",
-        lengths_named={"long": 224000})``
+        lengths_named={"long": 224000})``  (non-canon, ablation)
 
-All four wrappers live in their respective ``render_*.py`` files and
-exist purely so the CLI presets and viewer knobs stay familiar. Any
+The wrappers live in their respective ``render_*.py`` files and exist
+purely so the CLI presets and viewer knobs stay familiar. Any
 combination not representable by a wrapper can be requested directly
 from this script's CLI.
 """
@@ -117,6 +139,18 @@ def _hash_jitter(*parts: str, lo: float = 0.0, hi: float = 1.0) -> float:
     return lo + u * (hi - lo)
 
 
+def _det_seed(*parts: str) -> int:
+    """Deterministic 64-bit-ish seed derived from joined parts via sha256.
+
+    Replaces ``hash(tuple)`` for cross-process reproducibility — Python's
+    built-in ``hash`` is randomized per-process unless PYTHONHASHSEED is
+    fixed, which silently broke determinism for any code XOR-mixing the
+    project seed with ``hash((label, sid))``. sha256 has no such randomization.
+    """
+    h = hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
+    return int(h, 16)
+
+
 def _stratified_placements(n: int, *key_parts: str) -> List[float]:
     """Return ``n`` placements in [0, 1], stratified: one per equal-
     width bin, jittered deterministically within each bin. Large N
@@ -130,58 +164,118 @@ def _stratified_placements(n: int, *key_parts: str) -> List[float]:
     ]
 
 
-def _per_scenario_stratified_placements(
+def _per_scenario_stratified_log_lengths(
     triples: Sequence[Tuple[str, str, str]],
     n_d_eff: int,
     n_l_eff: int,
     seed: int,
-) -> Dict[Tuple[str, str, str, int, int], float]:
-    """Stratified placement *across items within each scenario*.
+    length_min: int,
+    length_max: int,
+) -> Dict[Tuple[str, str, str, int, int], int]:
+    """Stratified log-uniform char-budget sampling within each scenario.
 
-    Within one scenario, the cells (variant, perm, draw_idx, length_idx)
-    are listed; placements are drawn at the midpoints of equal-width
-    bins of [0, 1]; then they are deterministically permuted (RNG
-    seeded by (sid, seed)) so that each cell receives one placement and
-    placement is uncorrelated with variant / c-seed / ab-seed / draw /
-    length within the scenario.
+    Mirror of ``_per_scenario_stratified_placements`` but on the length
+    axis and on a log scale. For each scenario, every cell (variant,
+    perm, draw_idx, length_idx) gets one char budget; the budgets are
+    bin midpoints of equal-width bins on log10([length_min, length_max])
+    then deterministically permuted (seeded by (sid, seed)).
 
     Properties:
-    * Each scenario's mean placement is exactly the bin-midpoint
-      average ≈ 0.5.
-    * Each scenario contributes equally to every placement quantile.
-    * Marginal placement distribution across the full dataset is
-      uniform by construction.
+    * Each scenario covers the log-length range uniformly.
+    * Geometric mean per scenario is exactly the geometric mean of the
+      bookends.
+    * Length is uncorrelated with variant / perm / draw / length_idx
+      within scenario.
     * Reproducible: same seed → same assignment.
 
     Returns:
-        ``{(sid, variant, perm_label, draw_idx, length_idx): placement_frac}``.
+        ``{(sid, variant, perm_label, draw_idx, length_idx): char_budget_int}``.
     """
-    # Group triples by scenario_id, preserving the deterministic order
-    # in which they were enumerated upstream.
+    import math
+    log_lo = math.log(length_min)
+    log_hi = math.log(length_max)
+
     by_sid: Dict[str, List[Tuple[str, str, str]]] = {}
     for triple in triples:
         sid, variant, perm_label = triple
         by_sid.setdefault(sid, []).append(triple)
 
-    out: Dict[Tuple[str, str, str, int, int], float] = {}
+    out: Dict[Tuple[str, str, str, int, int], int] = {}
     for sid, scen_triples in by_sid.items():
         n_cells = len(scen_triples) * max(1, n_d_eff) * max(1, n_l_eff)
-        # Bin midpoints — exactly uniform across the scenario.
-        placements = [(i + 0.5) / n_cells for i in range(n_cells)]
-        # Deterministic shuffle: each scenario gets its own permutation
-        # but identical input data → identical placements.
-        rng = random.Random(seed ^ hash(("scenario_strat", sid)))
-        rng.shuffle(placements)
+        # Bin midpoints on log scale → exp back to char count → round to int.
+        log_lengths = [
+            log_lo + (log_hi - log_lo) * (i + 0.5) / n_cells
+            for i in range(n_cells)
+        ]
+        budgets = [int(round(math.exp(x))) for x in log_lengths]
+        # Deterministic shuffle per scenario, distinct from the placement shuffle.
+        rng = random.Random(seed ^ _det_seed("scenario_strat_loglen", sid))
+        rng.shuffle(budgets)
 
-        # Walk cells in a stable nested order (triple, draw, length) so
-        # the assignment is a pure function of the input.
         idx = 0
         for triple in scen_triples:
             sid_, variant, perm_label = triple
             for d_idx in range(max(1, n_d_eff)):
                 for l_idx in range(max(1, n_l_eff)):
-                    out[(sid_, variant, perm_label, d_idx, l_idx)] = placements[idx]
+                    out[(sid_, variant, perm_label, d_idx, l_idx)] = budgets[idx]
                     idx += 1
+    return out
+
+
+def _seed_slot_count(variant: str) -> int:
+    """How many independently-placed seeds a variant has in the haystack.
+    A+C and B+C have two (C-grounding plus the A or B profile fact);
+    C/A/B have one."""
+    return 2 if variant in ("A+C", "B+C") else 1
+
+
+def _per_scenario_stratified_placements(
+    triples: Sequence[Tuple[str, str, str]],
+    n_d_eff: int,
+    n_l_eff: int,
+    seed: int,
+) -> Dict[Tuple[str, str, str, int, int, int], float]:
+    """Per-slot stratified placement, independent across slots.
+
+    For each (sid, variant, perm, draw_idx, length_idx, slot_idx) cell
+    where slot_idx < _seed_slot_count(variant), assign a placement_frac
+    in [0, 1]. Within a scenario × slot, placements are bin midpoints
+    deterministically shuffled. Different slots use independent
+    shuffles, so the C-seed depth and the A/B-seed depth are
+    uncorrelated within the same row.
+
+    Properties:
+    * Each (scenario, slot) marginal mean placement = 0.5.
+    * Marginal placement distribution per slot is uniform across the
+      full dataset.
+    * Reproducible: same seed → same assignment.
+    """
+    by_sid: Dict[str, List[Tuple[str, str, str]]] = {}
+    for triple in triples:
+        sid, _, _ = triple
+        by_sid.setdefault(sid, []).append(triple)
+
+    out: Dict[Tuple[str, str, str, int, int, int], float] = {}
+    max_slots = max((_seed_slot_count(t[1]) for t in triples), default=0)
+
+    for sid, scen_triples in by_sid.items():
+        for slot_idx in range(max_slots):
+            cells = [
+                (triple, d_idx, l_idx)
+                for triple in scen_triples
+                if _seed_slot_count(triple[1]) > slot_idx
+                for d_idx in range(max(1, n_d_eff))
+                for l_idx in range(max(1, n_l_eff))
+            ]
+            if not cells:
+                continue
+            placements = [(i + 0.5) / len(cells) for i in range(len(cells))]
+            rng = random.Random(seed ^ _det_seed("scenario_strat", sid, str(slot_idx)))
+            rng.shuffle(placements)
+            for (triple, d_idx, l_idx), p in zip(cells, placements):
+                sid_, variant, perm_label = triple
+                out[(sid_, variant, perm_label, d_idx, l_idx, slot_idx)] = p
     return out
 
 
@@ -206,9 +300,10 @@ def _assign_distractors(
     For each of the ``n_per_item`` "slots" we produce an independent
     pool shuffle (seeded by ``seed + draw_idx + slot * STRIDE``) and
     walk it round-robin over items. Within a slot usage is perfectly
-    balanced (⌈N/99⌉ or ⌊N/99⌋ per hash). Across slots of the same
-    item we reject-sample on collision — the probability of a
-    same-item clash is ~k/99 so the loop terminates fast.
+    balanced (⌈N/P⌉ or ⌊N/P⌋ per hash, where P = pool size). Across
+    slots of the same item we reject-sample on collision — the
+    probability of a same-item clash is ~k/P so the loop terminates
+    fast.
 
     Returns:
         ``{triple: (hash_slot0, hash_slot1, ..., hash_slot{n-1})}``.
@@ -308,6 +403,8 @@ def mix(
     placements_list: Optional[Sequence[float]] = None,
     lengths_named: Optional[Dict[str, int]] = None,
     lengths_list: Optional[Sequence[int]] = None,
+    length_mode: Literal["fixed", "log_uniform_stratified"] = "fixed",
+    length_range: Optional[Tuple[int, int]] = None,
     include_constraint_inline: bool = False,
     c_only: bool = False,
     seed: int = ASSIGNMENT_SEED,
@@ -377,16 +474,51 @@ def mix(
                 f"placements_list has {len(placements_list)} entries "
                 f"but n_placements={n_placements}"
             )
+    if length_mode not in ("fixed", "log_uniform_stratified"):
+        raise ValueError(
+            f"length_mode must be 'fixed' or 'log_uniform_stratified', got {length_mode!r}"
+        )
+    if length_mode == "log_uniform_stratified":
+        if not use_distractor:
+            raise ValueError(
+                "length_mode='log_uniform_stratified' requires "
+                "n_distractor_draws >= 1 (no haystack to size otherwise)."
+            )
+        if not length_range or len(length_range) != 2:
+            raise ValueError(
+                "length_mode='log_uniform_stratified' requires "
+                "length_range=(min_chars, max_chars)."
+            )
+        lmin, lmax = int(length_range[0]), int(length_range[1])
+        if not (0 < lmin < lmax):
+            raise ValueError(
+                f"length_range must satisfy 0 < min < max, got ({lmin}, {lmax})"
+            )
 
     # Normalize effective counts (each axis iterates at least once)
     n_d_eff = max(1, n_distractor_draws)
     n_p_eff = max(1, n_placements)
     n_l_eff = max(1, n_lengths)
 
-    # Resolve named lengths
+    # Resolve named lengths. In fixed mode this comes from lengths_named /
+    # lengths_list. In log_uniform_stratified mode it gets overridden per
+    # cell from the precomputed map; lengths_resolved is used only for
+    # the manifest header name.
     lengths_resolved: List[Tuple[str, int]] = []
     if use_distractor:
-        if lengths_named:
+        if length_mode == "log_uniform_stratified":
+            # Single nominal length tier; per-row budget overridden per cell.
+            lengths_resolved = [(
+                f"log_uniform_{int(length_range[0])}_{int(length_range[1])}",
+                int(length_range[1]),  # placeholder; per-row budget overrides
+            )]
+            if n_l_eff != 1:
+                raise ValueError(
+                    "length_mode='log_uniform_stratified' currently supports n_lengths=1 "
+                    "only (one stratified char budget per cell). "
+                    f"Got n_lengths={n_lengths}."
+                )
+        elif lengths_named:
             lengths_resolved = list(lengths_named.items())[:n_l_eff]
         elif lengths_list:
             lengths_resolved = [(f"L{i}", L) for i, L in enumerate(lengths_list[:n_l_eff])]
@@ -430,6 +562,16 @@ def mix(
     if placement_mode == "uniform_stratified" and use_distractor:
         strat_placement_map = _per_scenario_stratified_placements(
             triples, n_d_eff, n_l_eff, seed,
+        )
+
+    # Same shape, but for per-cell char budget when length_mode is
+    # log_uniform_stratified. Map value is an int (the actual char budget
+    # for that cell). Empty when length_mode='fixed'.
+    strat_length_map: Dict[Tuple[str, str, str, int, int], int] = {}
+    if length_mode == "log_uniform_stratified" and use_distractor:
+        strat_length_map = _per_scenario_stratified_log_lengths(
+            triples, n_d_eff, n_l_eff, seed,
+            int(length_range[0]), int(length_range[1]),
         )
 
     # Stats
@@ -507,7 +649,15 @@ def mix(
             for h in d_hashes:
                 distractor_usage[h] = distractor_usage.get(h, 0) + 1
 
-            for length_idx, (length_name, char_budget) in enumerate(lengths_resolved):
+            for length_idx, (length_name, fixed_budget) in enumerate(lengths_resolved):
+                # Per-cell budget when sampling on log scale; otherwise the
+                # named/fixed budget from lengths_resolved.
+                if length_mode == "log_uniform_stratified":
+                    char_budget = strat_length_map[
+                        (sid, variant, perm_label, draw_idx, length_idx)
+                    ]
+                else:
+                    char_budget = fixed_budget
                 cache_key = (d_hashes, char_budget)
                 if cache_key not in pair_cache:
                     budget = char_budget - PREAMBLE_RESERVE - EVIDENCE_RESERVE - USER_MSG_RESERVE
@@ -543,86 +693,103 @@ def mix(
                 truncated_pairs = pair_cache[cache_key]
                 n_pairs = len(truncated_pairs)
 
-                # Pick placements for this (triple, draw, length)
+                # One placement per evidence seed slot. Independent
+                # stratification across slots: the C-grounding seed and
+                # the A/B profile seed (when present) float independently
+                # in the haystack.
+                n_slots = _seed_slot_count(variant)
                 if placement_mode == "fixed":
-                    placements = [float(x) for x in list(placements_list)[:n_p_eff]]
+                    fixed_list = [float(x) for x in list(placements_list)[:n_p_eff]]
+                    seed_placements = (fixed_list * ((n_slots // len(fixed_list)) + 1))[:n_slots]
                 elif placement_mode == "uniform_stratified":
-                    # Single placement, drawn from the precomputed
-                    # per-scenario stratified+balanced assignment.
-                    placements = [strat_placement_map[
-                        (sid, variant, perm_label, draw_idx, length_idx)
-                    ]]
+                    seed_placements = [
+                        strat_placement_map[(sid, variant, perm_label, draw_idx, length_idx, s)]
+                        for s in range(n_slots)
+                    ]
                 else:
-                    placements = _stratified_placements(
-                        n_p_eff,
-                        sid, variant, perm_label,
-                        str(draw_idx), str(length_idx),
-                    )
+                    seed_placements = [
+                        _stratified_placements(
+                            1,
+                            sid, variant, perm_label,
+                            str(draw_idx), str(length_idx), str(s),
+                        )[0]
+                        for s in range(n_slots)
+                    ]
 
-                for placement_idx, placement_frac in enumerate(placements):
-                    # assemble_at_pair_boundary mutates evidence-pair
-                    # timestamps in-place; rebuild them fresh and
-                    # deep-copy the distractor pairs so the cached
-                    # version stays clean for the next placement.
-                    evidence_pairs = evidence_pairs_from_seeds(seeds)
-                    distractor_pairs_copy = deepcopy(truncated_pairs)
-                    flat, insert_idx, _ = assemble_at_pair_boundary(
-                        distractor_pairs_copy, evidence_pairs, placement_frac,
-                    )
-                    assert_alternation(flat)
-                    conv_text = turns_to_text(flat)
-                    system_prompt = build_system_prompt(conv_text)
+                # Build evidence pairs (one per seed) and assemble. Deep-
+                # copy distractor_pairs so the cached version stays clean
+                # for the next row. row_key drives sha256-based selection
+                # of evidence prefixes / acks / resumption phrases so
+                # different rows surface different combinations.
+                row_key = (sid, variant, perm_label, str(draw_idx), str(length_idx))
+                evidence_pairs = evidence_pairs_from_seeds(seeds, row_key=row_key)
+                distractor_pairs_copy = deepcopy(truncated_pairs)
+                flat, insert_idxs, _ = assemble_at_pair_boundary(
+                    distractor_pairs_copy, evidence_pairs, seed_placements,
+                    row_key=row_key,
+                )
+                assert_alternation(flat)
+                conv_text = turns_to_text(flat)
+                system_prompt = build_system_prompt(conv_text)
 
-                    # When only one distractor is merged, populate the
-                    # legacy singular fields for back-compat with
-                    # analysis code; leave them null for n>1 so nothing
-                    # silently treats the first hash as "the" hash.
-                    singular_hash = d_hashes[0] if len(d_hashes) == 1 else None
-                    singular_domain = (
-                        distractors[0].domain if len(d_hashes) == 1 else None
-                    )
-                    meta = {
-                        "scenario_id": sid,
-                        "evidence_variant": variant,
-                        "permutation": perm_label,
-                        "draw_idx": draw_idx,
-                        "length_idx": length_idx,
-                        "length_name": length_name,
-                        "char_budget": char_budget,
-                        "placement_idx": placement_idx,
-                        "placement_frac": placement_frac,
-                        "insert_pair_idx": insert_idx,
-                        "n_distractor_pairs": n_pairs,
-                        "expected_answer": expected,
-                        "query_with_options": q_with_opts,
-                        "constraint_description": constraint,
-                        "input_char_len": len(system_prompt) + len(user_msg),
-                        "condition": condition_label,
-                        "distractor_hash": singular_hash,
-                        "distractor_domain": singular_domain,
-                        "distractor_hashes": list(d_hashes),
-                        "distractor_domains": [d.domain for d in distractors],
-                        "n_distractors_merged": len(d_hashes),
-                        "merge_gap_days": (
-                            merge_gap_days if len(d_hashes) > 1 else None
-                        ),
-                        "assignment_seed": seed,
-                    }
-                    record = {
-                        "system_prompt": system_prompt,
-                        "user_message": user_msg,
-                        "metadata": meta,
-                    }
-                    fname = (
-                        f"{sid}_{variant}_{perm_label}"
-                        f"_d{draw_idx}_L{length_idx}_P{placement_idx}.json"
-                    )
-                    (out_dir / fname).write_text(
-                        json.dumps(record, indent=2, ensure_ascii=False)
-                    )
-                    built += 1
-                    char_samples.append(meta["input_char_len"])
-                    placement_samples.append(placement_frac)
+                singular_hash = d_hashes[0] if len(d_hashes) == 1 else None
+                singular_domain = (
+                    distractors[0].domain if len(d_hashes) == 1 else None
+                )
+
+                # placement_frac records C-seed depth only (slot 0 for
+                # C-bearing variants). Null for A/B no-C rows where there
+                # is no constraint-grounding seed to track.
+                if "C" in variant:
+                    placement_frac_c = seed_placements[0]
+                    insert_pair_idx_c = insert_idxs[0]
+                else:
+                    placement_frac_c = None
+                    insert_pair_idx_c = None
+
+                meta = {
+                    "scenario_id": sid,
+                    "evidence_variant": variant,
+                    "permutation": perm_label,
+                    "draw_idx": draw_idx,
+                    "length_idx": length_idx,
+                    "length_name": length_name,
+                    "char_budget": char_budget,
+                    "placement_frac": placement_frac_c,
+                    "insert_pair_idx": insert_pair_idx_c,
+                    "n_distractor_pairs": n_pairs,
+                    "n_evidence_seeds": n_slots,
+                    "expected_answer": expected,
+                    "query_with_options": q_with_opts,
+                    "constraint_description": constraint,
+                    "input_char_len": len(system_prompt) + len(user_msg),
+                    "condition": condition_label,
+                    "distractor_hash": singular_hash,
+                    "distractor_domain": singular_domain,
+                    "distractor_hashes": list(d_hashes),
+                    "distractor_domains": [d.domain for d in distractors],
+                    "n_distractors_merged": len(d_hashes),
+                    "merge_gap_days": (
+                        merge_gap_days if len(d_hashes) > 1 else None
+                    ),
+                    "assignment_seed": seed,
+                }
+                record = {
+                    "system_prompt": system_prompt,
+                    "user_message": user_msg,
+                    "metadata": meta,
+                }
+                fname = (
+                    f"{sid}_{variant}_{perm_label}"
+                    f"_d{draw_idx}_L{length_idx}.json"
+                )
+                (out_dir / fname).write_text(
+                    json.dumps(record, indent=2, ensure_ascii=False)
+                )
+                built += 1
+                char_samples.append(meta["input_char_len"])
+                if placement_frac_c is not None:
+                    placement_samples.append(placement_frac_c)
 
     manifest = {
         "condition": condition_label,
@@ -633,6 +800,11 @@ def mix(
         "n_lengths": n_lengths,
         "placement_mode": placement_mode,
         "placements_list": list(placements_list) if placements_list else None,
+        "length_mode": length_mode,
+        "length_range": (
+            [int(length_range[0]), int(length_range[1])]
+            if length_mode == "log_uniform_stratified" and length_range else None
+        ),
         "lengths": [{"name": n, "char_budget": b} for n, b in lengths_resolved],
         "c_only": c_only,
         "include_constraint_inline": include_constraint_inline,
@@ -704,6 +876,16 @@ def main():
         help="Comma-separated names matched to --lengths (e.g. 'short,long'). "
              "Defaults to L0,L1,... if omitted.",
     )
+    ap.add_argument(
+        "--length-mode",
+        choices=["fixed", "log_uniform_stratified"],
+        default="fixed",
+    )
+    ap.add_argument(
+        "--length-range", type=str, default="",
+        help="'min,max' char budgets for --length-mode=log_uniform_stratified, "
+             "e.g. '3000,250000'.",
+    )
     ap.add_argument("--include-constraint-inline", action="store_true")
     ap.add_argument("--c-only", action="store_true")
     ap.add_argument("--seed", type=int, default=ASSIGNMENT_SEED)
@@ -727,6 +909,15 @@ def main():
         else:
             lengths_named = {f"L{i}": b for i, b in enumerate(budgets)}
 
+    length_range_tuple: Optional[Tuple[int, int]] = None
+    if args.length_range:
+        parts = [x.strip() for x in args.length_range.split(",") if x.strip()]
+        if len(parts) != 2:
+            raise SystemExit(
+                f"--length-range expects 'min,max', got {args.length_range!r}"
+            )
+        length_range_tuple = (int(parts[0]), int(parts[1]))
+
     manifest = mix(
         out_dir=Path(args.out_dir),
         n_distractor_draws=args.n_distractor_draws,
@@ -736,6 +927,8 @@ def main():
         placement_mode=args.placement_mode,
         placements_list=placements_list,
         lengths_named=lengths_named,
+        length_mode=args.length_mode,
+        length_range=length_range_tuple,
         include_constraint_inline=args.include_constraint_inline,
         c_only=args.c_only,
         seed=args.seed,

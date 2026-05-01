@@ -9,13 +9,19 @@ triggering query goes in a fresh user message. No distractor
 material interleaved — tests pure history integration, not long-
 context attention.
 
+Since 2026-05-01 this preset enumerates all 5 variants (C / A+C / B+C
+/ A / B). For A and B no-C variants the conversation history contains
+just the A or B profile fact (no constraint anywhere); measures
+spurious-flag behaviour with minimal history.
+
 Thin wrapper over ``mixer.mix()`` with:
 
     n_distractor_draws = 0
     n_placements       = 0
     n_lengths          = 0
     include_constraint_inline = False
-    condition_label    = "no_distractor"
+    c_only             = False  (full 5-variant by default)
+    condition_label    = "canon_no_distractor"
 """
 
 from __future__ import annotations
@@ -29,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from renderers.mixer import mix  # noqa: E402
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-OUT_DIR = BASE_DIR / "generated" / "no_distractor"
+OUT_DIR = BASE_DIR / "generated" / "canon_no_distractor"
 
 
 def render(
@@ -43,7 +49,7 @@ def render(
         n_lengths=0,
         include_constraint_inline=False,
         c_only=c_only,
-        condition_label="no_distractor",
+        condition_label="canon_no_distractor",
     )
 
 
@@ -52,7 +58,8 @@ def main():
     ap.add_argument("--out-dir", type=str, default=str(OUT_DIR))
     ap.add_argument(
         "--c-only", action="store_true",
-        help="Only render C-present variants (skip A and B baselines).",
+        help="Restrict to C-bearing variants (skip A and B no-C). Off by "
+             "default — canon_no_distractor includes all 5 variants.",
     )
     args = ap.parse_args()
 

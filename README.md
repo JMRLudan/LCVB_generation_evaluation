@@ -208,17 +208,24 @@ python pipeline/renderers/mixer.py \
     --condition-label custom
 ```
 
-The viewer ships five **canon presets** matching the paper's full-
+The viewer ships three **canon presets** matching the paper's full-
 table conditions — one-click generation via the "Generate canon"
 button:
 
 | Preset | Axes | Notes |
 |---|---|---|
-| `canon_direct` | — | ceiling (constraint inline) |
-| `canon_no_distractor` | — | primary (short system-prompt history) |
-| `canon_uniform_short` | 1 stratified placement × 10K chars, `n_distractors_per_prompt=3` | uniform sweep, per-scenario stratified |
-| `canon_uniform_medium` | 1 stratified placement × 100K chars, `n_distractors_per_prompt=3` | uniform sweep, per-scenario stratified |
-| `canon_uniform_long` | 1 stratified placement × 250K chars, `n_distractors_per_prompt=3` | uniform sweep, per-scenario stratified |
+| `canon_direct` | — | ceiling (constraint inline). Full 5-variant: `C / A+C / B+C / A / B`. 2 122 prompts. |
+| `canon_no_distractor` | — | primary (short system-prompt history). Full 5-variant. 2 122 prompts. |
+| `canon_unified` | 3× resample per tuple, `n_distractors_per_prompt=3`, `placement_mode="uniform_stratified"`, `length_mode="log_uniform_stratified"`, `length_range=(3000, 250000)` | with-distractor preset. Joint per-row sampling of length (log-uniform, stratified within scenario) and depth (uniform, stratified within scenario). Full 5-variant. 6 366 prompts. |
+
+Total per-model prompt count across the three canon presets: **10 610**.
+
+`canon_unified` replaces the prior three-tier
+`canon_uniform_short/medium/long` split (2026-05-01). Length is now a
+continuous per-row variable rather than a fixed-tier choice; the
+headline plot becomes a 2D surface `SR(length, depth)` instead of three
+overlaid depth curves. See `DESIGN.md` for the full rationale and
+configuration table.
 
 ---
 
@@ -254,13 +261,21 @@ whether models spot a constraint buried in plausibly-coherent history.
 
 ### Truncation
 
-- When a distractor conversation is too long to fit the char budget,
-  truncate by **keeping the beginning and removing the end.** Walk pair-
-  by-pair from index 0 forward and stop as soon as the next pair would
-  exceed the budget. Drop everything after.
+- The char budget acts as a **floor**, not a ceiling: walk pair-by-pair
+  from index 0 forward and stop as soon as the running char total
+  reaches or exceeds the budget. The pair that crossed the budget is
+  the last one kept. Drop everything after.
+- Floor semantics (since 2026-05-01) prevents the empty-haystack
+  pathology at the low end of canon_unified's log-uniform char range:
+  under the old ceiling rule, a small budget split across stitched
+  distractors could produce zero pairs per chat. Floor guarantees at
+  least one pair per non-empty chat. At larger budgets the behavior is
+  effectively identical to the old ceiling rule (one pair of overshoot,
+  hidden against multi-K-char haystacks).
+- Truncation direction is always **keep beginning, drop end**. Earlier
+  pairs are the ones that stay.
 - Never drop pairs from the middle — the kept sequence must be a
   contiguous prefix.
-- Never flip the direction — earlier pairs are the ones that stay.
 
 ### Alternation and endpoints
 

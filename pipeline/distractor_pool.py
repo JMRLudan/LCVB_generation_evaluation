@@ -20,17 +20,15 @@ Each distractor JSON has schema:
 Construction invariants (also documented in the project memory and in the
 top-level README) that every renderer in this repo MUST satisfy:
 
-  - **One distractor per prompt** in the default renderers. No stitching of
-    multiple distractor conversations in a single prompt — each distractor
-    is a continuous multi-turn dialogue on a single topic; interleaving them
-    would inject coherence artifacts the benchmark is trying to avoid.
   - **No two scenarios share the same distractor within a single draw.**
-    With 99 distractors and 85 scenarios (86 rows in the TSV, minus one
-    status=="reject"), each draw is a 1-to-1 assignment using an 85-subset
-    of 99.
+    The pool currently holds 96 deduplicated distractor groups (post
+    2026-05-01 LCVB-substring strip — see JOURNAL.md). With 85 scenarios,
+    each draw is a 1-to-1 assignment using an 85-subset of the pool.
+    Pool size is read dynamically from index.json, not hard-coded.
   - **Deterministic assignment seed: 4232026.** For draw index `d`, the
-    permutation is `random.Random(4232026 + d).sample(all_hashes, 99)`
-    and scenario `scenarios_sorted[i]` is assigned `permutation[i]`.
+    permutation is `random.Random(4232026 + d).sample(all_hashes,
+    len(all_hashes))` and scenario `scenarios_sorted[i]` is assigned
+    `permutation[i]`.
 
 The multi-distractor "stitched" harder variant is implemented elsewhere
 (`renderers/render_stitched_locations.py`) and is NOT the default.
@@ -84,7 +82,7 @@ def load_pool(distractors_dir: Path | None = None) -> Dict[str, Distractor]:
     if not idx.exists():
         raise FileNotFoundError(
             f"Pool index not found at {idx}. Expected data/distractors/index.json "
-            f"listing the 99 deduplicated distractor groups."
+            f"listing the deduplicated distractor groups."
         )
     with open(idx) as f:
         index_data = json.load(f)
@@ -132,11 +130,12 @@ def assign_distractors(
 
     Guarantees:
       - Within each draw, no two scenarios share the same distractor
-        (1-to-1 assignment, using an N-subset of 99 where N = len(scenarios)).
+        (1-to-1 assignment, using an N-subset of the pool where N =
+        len(scenarios)).
       - The assignment is reproducible: same (seed, num_draws, pool,
         scenario_ids) → identical output.
       - Across draws, every scenario sees an independent fresh permutation
-        of the 99 hashes (seeded by `seed + draw_idx`). Distractor usage is
+        of the pool (seeded by `seed + draw_idx`). Distractor usage is
         balanced in expectation as `num_draws` grows.
 
     Args:
@@ -164,7 +163,7 @@ def assign_distractors(
     draws: List[Dict[str, str]] = []
     for d in range(num_draws):
         rng = random.Random(seed + d)
-        permutation = rng.sample(hashes, n_pool)  # full shuffle of 99
+        permutation = rng.sample(hashes, n_pool)  # full shuffle of the pool
         assignment = {
             sid: permutation[i] for i, sid in enumerate(scenarios_sorted)
         }

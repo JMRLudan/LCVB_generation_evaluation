@@ -93,6 +93,11 @@ ANTHROPIC_TO_OR_PRICING_DEFAULT: dict[str, str] = {
     "claude-sonnet-4-5":           "anthropic/claude-sonnet-4.5",
     "claude-sonnet-4-5-20250929":  "anthropic/claude-sonnet-4.5",
     "claude-sonnet-4-5-20250514":  "anthropic/claude-sonnet-4.5",  # legacy alias
+    # 2026-05-01: Stage-2 frontier roster. Aliases resolve to current
+    # versions on the API; OR pricing slugs are kept up to date.
+    "claude-sonnet-4-6":           "anthropic/claude-sonnet-4.6",
+    "claude-opus-4-6":             "anthropic/claude-opus-4.6",
+    "claude-opus-4-7":             "anthropic/claude-opus-4.7",
 }
 
 COST_COLS = [
@@ -687,6 +692,81 @@ class OpenRouterClient:
         return response_data, in_tok, out_tok, latency_ms, status, error
 
     # ───── Convenience accessors ──────────────────────────────────────
+    # ───── Public: log a batch of pre-completed results ──────────────
+    def log_batch_results(
+        self,
+        results: list,                 # list[BatchResult]
+        *,
+        model: str,
+        provider: str,
+        or_pricing_id: str | None = None,
+        batch_discount: float = 0.5,
+    ) -> float:
+        """Append cost + raw I/O rows for a batch of completed results.
+
+        Used by `pipeline.batch_runner` after a provider batch job
+        finishes. Cost rows are tagged with the synthesized provider
+        string ``f"{provider}_batch"`` so they're distinguishable from
+        real-time calls in `costs.csv`. Returns the total billed USD.
+
+        `batch_discount` defaults to 0.5 (the published rate for all
+        three currently-supported providers as of 2026-05).
+        Pass 0.0 to log at full real-time pricing.
+        """
+        # Lazy: only resolve pricing once we know we have results.
+        if not results:
+            return 0.0
+        or_id = self._resolve_pricing_id(model, provider, or_pricing_id)
+        prompt_p_tok, completion_p_tok = self._model_pricing(or_id)
+        prompt_p_tok *= (1.0 - batch_discount)
+        completion_p_tok *= (1.0 - batch_discount)
+
+        total = 0.0
+        provider_tag = f"{provider}_batch"
+        for r in results:
+            ts = datetime.now(timezone.utc).isoformat()
+            self._call_count += 1
+            in_tok = int(r.input_tokens or 0)
+            out_tok = int(r.output_tokens or 0)
+            in_cost = in_tok * prompt_p_tok if r.status == "ok" else 0.0
+            out_cost = out_tok * completion_p_tok if r.status == "ok" else 0.0
+            row_total = in_cost + out_cost
+            total += row_total
+            if r.status == "ok":
+                self._cost_total += row_total
+            self._append_cost({
+                "timestamp": ts,
+                "run_id": self.run_id,
+                "model": model,
+                "provider": provider_tag,
+                "input_tokens": in_tok,
+                "output_tokens": out_tok,
+                "prompt_price_per_mtok": f"{prompt_p_tok * 1_000_000:.6f}",
+                "completion_price_per_mtok": f"{completion_p_tok * 1_000_000:.6f}",
+                "input_cost_usd": f"{in_cost:.6f}",
+                "output_cost_usd": f"{out_cost:.6f}",
+                "total_cost_usd": f"{row_total:.6f}",
+                "latency_ms": "",
+                "status": r.status,
+                "error": (r.error or "")[:500],
+                "pricing_fetched_at": self.pricing_fetched_at,
+            })
+            # Raw I/O parity with real-time path. Request messages aren't
+            # available here (they're in the source prompt files), so we
+            # log only the response + the custom_id for traceback.
+            self._append_raw_io({
+                "timestamp": ts,
+                "run_id": self.run_id,
+                "call_idx": self._call_count,
+                "model": model,
+                "provider": provider_tag,
+                "model_params_json": json.dumps({"batch_discount": batch_discount}),
+                "request_messages_json": json.dumps({"custom_id": r.custom_id}),
+                "response_json": json.dumps(r.response or {}),
+                "error": r.error or "",
+            })
+        return total
+
     def total_cost(self) -> float:
         return self._cost_total
 

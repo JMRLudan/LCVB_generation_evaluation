@@ -10,6 +10,23 @@ generated/
 data/runs/
 pipeline/api_logs/
 
+# Archived Haiku-era data (canon_direct + canon_no_distractor results
+# and prompt sets, pre-2026-05-01 unified-canon refactor). Large,
+# run-specific, not part of the public benchmark surface.
+data/archive_canon_direct_*/
+data/archive_canon_no_distractor_*/
+data/archive_pre_unified_*/
+data/runs_pilot/
+archive_unstratified_*/
+
+# Per-run batch-API manifests (Anthropic Messages Batches batch_ids).
+# These are tied to our specific Stage-1 + Stage-2 runs.
+batch_manifests/
+
+# Curation artifact that references internal run_ids — re-generate
+# locally with the subagent prompts in JOURNAL.md.
+analysis/output/trend_examples.json
+
 # Python
 __pycache__/
 *.py[cod]
