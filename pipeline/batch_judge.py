@@ -430,7 +430,8 @@ def main() -> int:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--run-id", required=True)
     common.add_argument("--preset", required=True,
-                        choices=["canon_direct", "canon_no_distractor", "canon_unified"])
+                        choices=["canon_direct", "canon_no_distractor", "canon_unified",
+                                 "canon_xl_200k", "canon_xl_500k"])
     common.add_argument("--model", default="claude-haiku-4-5-20251001")
 
     p_sub = sub.add_parser("submit", parents=[common])

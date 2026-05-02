@@ -2674,6 +2674,318 @@ def api_scenario():
 
 
 # ──────────────────────────────────────────────────────────────────────
+# XL (long-context) endpoints — canon_xl_200k / canon_xl_500k
+# ──────────────────────────────────────────────────────────────────────
+XL_PRESETS = ("canon_xl_200k", "canon_xl_500k")
+_XL_RUN_CACHE: dict[tuple[str, str, str], dict] = {}
+
+
+def _load_xl_run(preset: str, model: str, run_id: str) -> dict:
+    """Load + parse a canon_xl_* results.tsv. Cached.
+    Same row-flag schema as _load_run() so downstream stat code reuses."""
+    key = (preset, model, run_id)
+    if key in _XL_RUN_CACHE:
+        return _XL_RUN_CACHE[key]
+    tsv = RUNS_DIR / preset / model.replace("/", "_") / run_id / "results.tsv"
+    if not tsv.exists():
+        return {"rows": [], "tsv": str(tsv)}
+    rows: list[dict] = []
+    with open(tsv) as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for r in reader:
+            r["_is_error"] = (r.get("raw_response") or "").startswith(("ERROR", '"ERROR'))
+            r["_vigilance"] = _coerce_bool(r.get("vigilance"))
+            r["_vig_set"] = (r.get("vigilance") not in ("", None) and not r["_is_error"])
+            cm = (r.get("constraint_mentioned") or "").strip().upper()
+            r["_cm_set"] = cm in ("YES", "NO"); r["_cm"] = (cm == "YES")
+            mue = (r.get("mentions_user_evidence") or "").strip().upper()
+            r["_mue_set"] = mue in ("YES", "NO"); r["_mue"] = (mue == "YES")
+            r["_false_alarm"] = _coerce_bool(r.get("false_alarm"))
+            r["_vig_set_ab"] = (r.get("false_alarm") not in ("", None) and not r["_is_error"])
+            rows.append(r)
+    out = {"rows": rows, "tsv": str(tsv), "preset": preset, "model": model, "run_id": run_id}
+    _XL_RUN_CACHE[key] = out
+    return out
+
+
+def _list_xl_runs(preset: str) -> list[dict]:
+    cond = RUNS_DIR / preset
+    out = []
+    if not cond.exists():
+        return out
+    for mdir in sorted(cond.iterdir()):
+        if not mdir.is_dir(): continue
+        runs = []
+        for rdir in sorted(mdir.iterdir()):
+            if not rdir.is_dir(): continue
+            tsv = rdir / "results.tsv"
+            if not tsv.exists(): continue
+            runs.append({"run_id": rdir.name, "mtime": tsv.stat().st_mtime})
+        if not runs: continue
+        runs.sort(key=lambda x: x["mtime"], reverse=True)
+        out.append({"model": mdir.name, "latest_run_id": runs[0]["run_id"],
+                    "all_runs": [r["run_id"] for r in runs]})
+    return out
+
+
+def _xl_preset_metrics(preset: str, model: str, run_id: str) -> dict:
+    run = _load_xl_run(preset, model, run_id)
+    rows = run.get("rows", [])
+    n = len(rows)
+    has_C = [r for r in rows if "C" in (r.get("evidence_variant") or "")]
+    sr = sum(1 for r in has_C if r["_vigilance"]) / max(len(has_C), 1)
+    cm = sum(1 for r in has_C if r["_cm"]) / max(len(has_C), 1)
+    mue = sum(1 for r in has_C if r["_mue"]) / max(len(has_C), 1)
+    fa_rows = [r for r in rows if r.get("evidence_variant") in ("A", "B")]
+    fa = sum(1 for r in fa_rows if r["_false_alarm"]) / max(len(fa_rows), 1)
+    return {"preset": preset, "model": model, "run_id": run_id, "n": n,
+            "n_constraint": len(has_C),
+            "SR": round(sr * 100, 2), "CM": round(cm * 100, 2),
+            "MUE": round(mue * 100, 2), "FA": round(fa * 100, 2)}
+
+
+@app.route("/api/xl/summary")
+def xl_summary():
+    """Per-band SR/CM/MUE for any model that has XL runs, plus paired
+    McNemar comparison for the bands that share scenarios."""
+    out = {"bands": {}, "paired": [], "models": []}
+    # discover models that have at least one XL preset
+    seen_models: set[str] = set()
+    for preset in XL_PRESETS:
+        out["bands"][preset] = []
+        for entry in _list_xl_runs(preset):
+            m = _xl_preset_metrics(preset, entry["model"], entry["latest_run_id"])
+            out["bands"][preset].append(m)
+            seen_models.add(entry["model"])
+    out["models"] = sorted(seen_models)
+    # canon_unified reference (same model, full canon)
+    out["reference"] = {}
+    for m in seen_models:
+        runs = [r for r in _list_models() if r["model"] == m]
+        if not runs: continue
+        run_id = runs[0]["latest_run_id"]
+        loaded = _load_run(m, run_id)
+        rs = loaded.get("rows", [])
+        has_C = [r for r in rs if "C" in (r.get("evidence_variant") or "")]
+        sr = sum(1 for r in has_C if r["_vigilance"]) / max(len(has_C), 1) if has_C else 0
+        out["reference"][m] = {"n": len(rs), "n_constraint": len(has_C), "SR": round(sr * 100, 2)}
+    # Paired analysis per model: same (sid, variant) cells in both bands
+    for m in seen_models:
+        b1 = _list_xl_runs("canon_xl_200k")
+        b2 = _list_xl_runs("canon_xl_500k")
+        m1 = next((b for b in b1 if b["model"] == m), None)
+        m2 = next((b for b in b2 if b["model"] == m), None)
+        if not m1 or not m2: continue
+        r1 = _load_xl_run("canon_xl_200k", m, m1["latest_run_id"])
+        r2 = _load_xl_run("canon_xl_500k", m, m2["latest_run_id"])
+        idx1 = {(r["scenario_id"], r["evidence_variant"]): r for r in r1["rows"] if "C" in r.get("evidence_variant","")}
+        idx2 = {(r["scenario_id"], r["evidence_variant"]): r for r in r2["rows"] if "C" in r.get("evidence_variant","")}
+        common = set(idx1) & set(idx2)
+        both = sum(1 for k in common if idx1[k]["_vigilance"] and idx2[k]["_vigilance"])
+        only200 = sum(1 for k in common if idx1[k]["_vigilance"] and not idx2[k]["_vigilance"])
+        only500 = sum(1 for k in common if not idx1[k]["_vigilance"] and idx2[k]["_vigilance"])
+        neither = sum(1 for k in common if not idx1[k]["_vigilance"] and not idx2[k]["_vigilance"])
+        out["paired"].append({"model": m, "n": len(common),
+                              "both": both, "only200": only200,
+                              "only500": only500, "neither": neither})
+    return jsonify(out)
+
+
+@app.route("/api/xl/rows")
+def xl_rows():
+    """Paginated row list for a single XL band. Includes a short
+    response excerpt and judge fields for quick scanning."""
+    preset = request.args.get("preset", "canon_xl_200k")
+    model = request.args.get("model")
+    run_id = request.args.get("run_id")
+    if preset not in XL_PRESETS or not model:
+        return jsonify({"error": "preset + model required"}), 400
+    runs = _list_xl_runs(preset)
+    if not run_id:
+        for entry in runs:
+            if entry["model"] == model:
+                run_id = entry["latest_run_id"]; break
+    if not run_id:
+        return jsonify({"error": "no run for that model"}), 404
+    run = _load_xl_run(preset, model, run_id)
+    rows = run.get("rows", [])
+    items = []
+    for i, r in enumerate(rows):
+        excerpt = (r.get("raw_response") or "").replace("\\n", " ")[:200]
+        items.append({
+            "idx": i,
+            "scenario_id": r.get("scenario_id"),
+            "evidence_variant": r.get("evidence_variant"),
+            "expected": r.get("expected_answer"),
+            "recommendation": r.get("recommendation"),
+            "vigilance": r["_vigilance"],
+            "constraint_mentioned": (r.get("constraint_mentioned") or "").upper(),
+            "mentions_user_evidence": (r.get("mentions_user_evidence") or "").upper(),
+            "false_alarm": r["_false_alarm"],
+            "is_error": r["_is_error"],
+            "excerpt": excerpt,
+        })
+    return jsonify({"items": items, "total": len(items),
+                    "preset": preset, "model": model, "run_id": run_id})
+
+
+@app.route("/api/xl/row")
+def xl_row():
+    """Single XL row with full response + matching prompt content."""
+    preset = request.args.get("preset", "canon_xl_200k")
+    model = request.args.get("model")
+    run_id = request.args.get("run_id")
+    idx = int(request.args.get("idx", "-1"))
+    if preset not in XL_PRESETS or not model or idx < 0:
+        return jsonify({"error": "preset + model + idx required"}), 400
+    runs = _list_xl_runs(preset)
+    if not run_id:
+        for entry in runs:
+            if entry["model"] == model:
+                run_id = entry["latest_run_id"]; break
+    run = _load_xl_run(preset, model, run_id)
+    rows = run.get("rows", [])
+    if idx >= len(rows):
+        return jsonify({"error": "idx out of range"}), 404
+    r = rows[idx]
+    # Recover the source prompt JSON
+    sid = r.get("scenario_id", "")
+    ev = r.get("evidence_variant", "")
+    perm = r.get("permutation", "")
+    base_perm = perm.split("-", 1)[0] if "-" in perm else perm
+    candidates = list((GENERATED_DIR / preset).glob(f"{sid}_{ev}_{base_perm}_d*_L*.json"))
+    prompt_data = None
+    if candidates:
+        try:
+            prompt_data = json.loads(candidates[0].read_text())
+        except Exception:
+            prompt_data = None
+    raw_resp = (r.get("raw_response") or "").replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
+    return jsonify({
+        "scenario_id": sid, "evidence_variant": ev, "permutation": perm,
+        "expected": r.get("expected_answer"), "recommendation": r.get("recommendation"),
+        "vigilance": r["_vigilance"],
+        "constraint_mentioned": (r.get("constraint_mentioned") or "").upper(),
+        "mentions_user_evidence": (r.get("mentions_user_evidence") or "").upper(),
+        "false_alarm": r["_false_alarm"], "abstained": _coerce_bool(r.get("abstained")),
+        "judge_explanation": (r.get("explanation") or "").replace("\\n", "\n"),
+        "raw_response": raw_resp,
+        "prompt": prompt_data,
+    })
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Surface (canon_unified SR(length, depth) heatmap per model)
+# ──────────────────────────────────────────────────────────────────────
+@app.route("/api/surface/data")
+def surface_data():
+    """Bin canon_unified rows into a (length, depth) grid for one model.
+    Returns a 2D matrix of SR values + cell counts so the frontend can
+    paint a heatmap."""
+    model = request.args.get("model")
+    run_id = request.args.get("run_id")
+    n_len = max(2, int(request.args.get("n_len", "8")))
+    n_dep = max(2, int(request.args.get("n_dep", "5")))
+    if not model:
+        return jsonify({"error": "model required"}), 400
+    run_id = _resolve_run_id(model, run_id)
+    if not run_id:
+        return jsonify({"error": "no run for that model"}), 404
+    rows = _load_run(model, run_id).get("rows", [])
+    rows = [r for r in rows
+            if "C" in (r.get("evidence_variant") or "")
+            and r.get("char_budget") and r.get("placement_frac") is not None
+            and r["_vig_set"]]
+    if not rows:
+        return jsonify({"error": "no valid rows"}), 404
+    import math
+    cb_vals = [r["char_budget"] for r in rows]
+    cb_min, cb_max = min(cb_vals), max(cb_vals)
+    log_min, log_max = math.log10(max(1, cb_min)), math.log10(max(2, cb_max))
+    dep_edges = [i / n_dep for i in range(n_dep + 1)]
+    len_edges = [10 ** (log_min + i * (log_max - log_min) / n_len) for i in range(n_len + 1)]
+    grid = [[{"n": 0, "vig": 0} for _ in range(n_len)] for _ in range(n_dep)]
+    for r in rows:
+        cb = r["char_budget"]; pf = r["placement_frac"]
+        # find length bin
+        li = min(n_len - 1, max(0, int((math.log10(cb) - log_min) / max(1e-9, log_max - log_min) * n_len)))
+        di = min(n_dep - 1, max(0, int(pf * n_dep)))
+        cell = grid[di][li]
+        cell["n"] += 1
+        if r["_vigilance"]: cell["vig"] += 1
+    out_grid = [[
+        {"n": c["n"], "sr": (c["vig"] / c["n"] if c["n"] else None)}
+        for c in row] for row in grid]
+    return jsonify({"model": model, "run_id": run_id,
+                    "n_total": len(rows),
+                    "len_edges": len_edges, "dep_edges": dep_edges,
+                    "grid": out_grid})
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Frontier (overlay of per-model SR-threshold contours)
+# ──────────────────────────────────────────────────────────────────────
+@app.route("/api/frontier/data")
+def frontier_data():
+    """For each model with canon_unified data, compute the binned
+    SR(length) curve (averaged over depth) and SR(depth) curve
+    (averaged over length). The frontend overlays these against an
+    SR threshold to surface where each model crosses below it."""
+    threshold = float(request.args.get("threshold", "80"))
+    n_len = max(2, int(request.args.get("n_len", "10")))
+    n_dep = max(2, int(request.args.get("n_dep", "10")))
+    import math
+    out = {"threshold": threshold, "models": []}
+    for entry in _list_models():
+        m = entry["model"]; run_id = entry["latest_run_id"]
+        rows = _load_run(m, run_id).get("rows", [])
+        rows = [r for r in rows
+                if "C" in (r.get("evidence_variant") or "")
+                and r.get("char_budget") and r.get("placement_frac") is not None
+                and r["_vig_set"]]
+        if not rows:
+            continue
+        cb_vals = [r["char_budget"] for r in rows]
+        cb_min, cb_max = min(cb_vals), max(cb_vals)
+        log_min = math.log10(max(1, cb_min)); log_max = math.log10(max(2, cb_max))
+        # Length curve (binned on log axis, averaged over all depths)
+        len_buckets = [{"n": 0, "vig": 0} for _ in range(n_len)]
+        len_centers = [10 ** (log_min + (i + 0.5) * (log_max - log_min) / n_len)
+                       for i in range(n_len)]
+        for r in rows:
+            li = min(n_len - 1, max(0, int(
+                (math.log10(r["char_budget"]) - log_min) /
+                max(1e-9, log_max - log_min) * n_len)))
+            len_buckets[li]["n"] += 1
+            if r["_vigilance"]: len_buckets[li]["vig"] += 1
+        len_curve = [
+            {"x": len_centers[i],
+             "sr": (b["vig"] / b["n"] * 100 if b["n"] else None),
+             "n": b["n"]}
+            for i, b in enumerate(len_buckets)]
+        # Depth curve (averaged over all lengths)
+        dep_buckets = [{"n": 0, "vig": 0} for _ in range(n_dep)]
+        for r in rows:
+            di = min(n_dep - 1, max(0, int(r["placement_frac"] * n_dep)))
+            dep_buckets[di]["n"] += 1
+            if r["_vigilance"]: dep_buckets[di]["vig"] += 1
+        dep_curve = [
+            {"x": (i + 0.5) / n_dep,
+             "sr": (b["vig"] / b["n"] * 100 if b["n"] else None),
+             "n": b["n"]}
+            for i, b in enumerate(dep_buckets)]
+        # Overall SR
+        overall = sum(1 for r in rows if r["_vigilance"]) / len(rows) * 100
+        out["models"].append({
+            "model": m, "run_id": run_id, "n": len(rows),
+            "overall_sr": round(overall, 2),
+            "length_curve": len_curve, "depth_curve": dep_curve,
+            "log_length_range": [log_min, log_max],
+        })
+    return jsonify(out)
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Entry point
 # ──────────────────────────────────────────────────────────────────────
 def main():

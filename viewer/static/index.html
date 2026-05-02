@@ -107,7 +107,8 @@
   body[data-tab="charts"]    .prompts-only,
   body[data-tab="charts"]    .paper-only,
   body[data-tab="charts"]    .tables-only,
-  body[data-tab="charts"]    .trends-only    { display: none !important; }
+  body[data-tab="charts"]    .trends-only,
+  .xl-only, .surface-only, .frontier-only { display: none !important; }
   body[data-tab="scenarios"] .charts-only,
   body[data-tab="scenarios"] .results-only,
   body[data-tab="scenarios"] .prompts-only,
@@ -131,19 +132,58 @@
   body[data-tab="paper"]     .results-only,
   body[data-tab="paper"]     .prompts-only,
   body[data-tab="paper"]     .tables-only,
-  body[data-tab="paper"]     .trends-only    { display: none !important; }
+  body[data-tab="paper"]     .trends-only,
+  .xl-only, .surface-only, .frontier-only { display: none !important; }
   body[data-tab="tables"]    .charts-only,
   body[data-tab="tables"]    .scenarios-only,
   body[data-tab="tables"]    .results-only,
   body[data-tab="tables"]    .prompts-only,
   body[data-tab="tables"]    .paper-only,
-  body[data-tab="tables"]    .trends-only    { display: none !important; }
+  body[data-tab="tables"]    .trends-only,
+  .xl-only, .surface-only, .frontier-only { display: none !important; }
   body[data-tab="trends"]    .charts-only,
   body[data-tab="trends"]    .scenarios-only,
   body[data-tab="trends"]    .results-only,
   body[data-tab="trends"]    .prompts-only,
   body[data-tab="trends"]    .paper-only,
-  body[data-tab="trends"]    .tables-only    { display: none !important; }
+  body[data-tab="trends"]    .tables-only,
+  body[data-tab="trends"]    .xl-only,
+  body[data-tab="trends"]    .surface-only,
+  body[data-tab="trends"]    .frontier-only  { display: none !important; }
+
+  /* Three new tabs: XL, Surface, Frontier */
+  body[data-tab="xl"]       .charts-only,
+  body[data-tab="xl"]       .scenarios-only,
+  body[data-tab="xl"]       .results-only,
+  body[data-tab="xl"]       .prompts-only,
+  body[data-tab="xl"]       .paper-only,
+  body[data-tab="xl"]       .tables-only,
+  body[data-tab="xl"]       .trends-only,
+  body[data-tab="xl"]       .surface-only,
+  body[data-tab="xl"]       .frontier-only  { display: none !important; }
+  body[data-tab="xl"]       .xl-only        { display: revert !important; }
+
+  body[data-tab="surface"]  .charts-only,
+  body[data-tab="surface"]  .scenarios-only,
+  body[data-tab="surface"]  .results-only,
+  body[data-tab="surface"]  .prompts-only,
+  body[data-tab="surface"]  .paper-only,
+  body[data-tab="surface"]  .tables-only,
+  body[data-tab="surface"]  .trends-only,
+  body[data-tab="surface"]  .xl-only,
+  body[data-tab="surface"]  .frontier-only  { display: none !important; }
+  body[data-tab="surface"]  .surface-only   { display: revert !important; }
+
+  body[data-tab="frontier"] .charts-only,
+  body[data-tab="frontier"] .scenarios-only,
+  body[data-tab="frontier"] .results-only,
+  body[data-tab="frontier"] .prompts-only,
+  body[data-tab="frontier"] .paper-only,
+  body[data-tab="frontier"] .tables-only,
+  body[data-tab="frontier"] .trends-only,
+  body[data-tab="frontier"] .xl-only,
+  body[data-tab="frontier"] .surface-only   { display: none !important; }
+  body[data-tab="frontier"] .frontier-only  { display: revert !important; }
 
   /* Tables tab */
   .tab-grid-tables {
@@ -660,6 +700,9 @@
   <button class="tab-btn" data-tab="paper">Paper tables &amp; analyses</button>
   <button class="tab-btn" data-tab="tables">Tables (cross-model)</button>
   <button class="tab-btn" data-tab="trends">Trends</button>
+  <button class="tab-btn" data-tab="xl">XL (long-context)</button>
+  <button class="tab-btn" data-tab="surface">SR Surface</button>
+  <button class="tab-btn" data-tab="frontier">Frontier</button>
 </div>
 
 <div class="toolbar">
@@ -817,6 +860,107 @@
 <div class="trends-only">
   <div class="trends-stack" id="trends-stack">
     <div class="trends-loading">Computing trend cards…</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     XL tab — Flash long-context experiment (200K + 500K)
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="xl-only">
+  <div class="panel full">
+    <h2>SR vs prompt length (Flash long-context experiment)</h2>
+    <p class="panel-sub">
+      255 paired prompts at 200K and 500K input tokens vs the canon_unified
+      reference (avg ~13K). Same scenarios × C-bearing variants at both bands.
+    </p>
+    <div class="chart-wrap"><svg id="xl-bar" viewBox="0 0 800 320"></svg></div>
+    <p class="small-meta" id="xl-meta"></p>
+  </div>
+
+  <div class="panel full">
+    <h2>Paired analysis (McNemar)</h2>
+    <p class="panel-sub">
+      Same (scenario, variant) cell at both bands. Off-diagonal counts
+      (200K-only vs 500K-only) measure how often vigilance fails when
+      the haystack grows.
+    </p>
+    <table class="summary-table" id="xl-paired-table"></table>
+  </div>
+
+  <div class="panel full">
+    <h2>Scenarios &amp; responses</h2>
+    <div class="toolbar" style="margin-bottom: 8px;">
+      <label>Band</label>
+      <select id="xl-band-sel">
+        <option value="canon_xl_200k">canon_xl_200k</option>
+        <option value="canon_xl_500k">canon_xl_500k</option>
+      </select>
+      <label>Model</label>
+      <select id="xl-model-sel"></select>
+      <label>Filter</label>
+      <select id="xl-filter-sel">
+        <option value="all">all</option>
+        <option value="failed">vigilance=0 only</option>
+        <option value="passed">vigilance=1 only</option>
+        <option value="errors">errors</option>
+      </select>
+    </div>
+    <table class="summary-table" id="xl-rows-table"
+           style="font-size: 11px; cursor: pointer;"></table>
+  </div>
+
+  <div class="panel full" id="xl-row-detail-wrap" style="display:none;">
+    <h2>Row detail</h2>
+    <div id="xl-row-detail"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     Surface tab — per-model SR(length, depth) heatmap on canon_unified
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="surface-only">
+  <div class="panel full">
+    <h2>SR surface — length × depth per model (canon_unified)</h2>
+    <p class="panel-sub">
+      Each cell shows the vigilance success rate (SR) on canon_unified
+      prompts whose char_budget falls in that length-decile and whose
+      placement_frac falls in that depth-bin. Green = high SR; red = low.
+    </p>
+    <div class="toolbar" style="margin-bottom: 8px;">
+      <label>Model</label>
+      <select id="surface-model-sel"></select>
+      <label>Length bins</label>
+      <input type="number" id="surface-nlen" value="8" min="3" max="20" style="width: 60px;" />
+      <label>Depth bins</label>
+      <input type="number" id="surface-ndep" value="5" min="3" max="10" style="width: 60px;" />
+    </div>
+    <div class="chart-wrap"><svg id="surface-svg" viewBox="0 0 1000 480"></svg></div>
+    <p class="small-meta" id="surface-meta"></p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     Frontier tab — per-model SR-vs-length curves with threshold overlay
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="frontier-only">
+  <div class="panel full">
+    <h2>Vigilance frontier — where each model crosses below threshold</h2>
+    <p class="panel-sub">
+      One line per model showing SR vs char_budget on a log axis.
+      Horizontal threshold line marks where SR drops below the chosen
+      cut-off. Where each model's curve dips below the line is its
+      operational frontier.
+    </p>
+    <div class="toolbar" style="margin-bottom: 8px;">
+      <label>SR threshold (%)</label>
+      <input type="range" id="frontier-thresh" min="50" max="95" value="80"
+             style="width: 200px;" />
+      <span id="frontier-thresh-val">80</span>%
+    </div>
+    <div class="chart-wrap"><svg id="frontier-len-svg" viewBox="0 0 1000 420"></svg></div>
+    <h3 style="margin-top: 18px;">SR vs depth (averaged over length)</h3>
+    <div class="chart-wrap"><svg id="frontier-dep-svg" viewBox="0 0 1000 360"></svg></div>
+    <p class="small-meta" id="frontier-meta"></p>
   </div>
 </div>
 
@@ -1252,6 +1396,9 @@ function setTab(tab) {
   if (tab === 'paper')     refreshPaperList();
   if (tab === 'tables')    refreshTables();
   if (tab === 'trends')    refreshTrends();
+  if (tab === 'xl')        refreshXl();
+  if (tab === 'surface')   refreshSurface();
+  if (tab === 'frontier')  refreshFrontier();
 }
 document.querySelectorAll('.tab-btn').forEach(b => {
   b.addEventListener('click', () => setTab(b.dataset.tab));
@@ -2706,6 +2853,414 @@ document.getElementById('tbl-copy-csv').addEventListener('click', async () => {
 
 buildStatButtons();
 fetchModels();
+
+// ─────────────────────────────────────────────────────────────
+// XL tab — Flash long-context experiment
+// ─────────────────────────────────────────────────────────────
+async function refreshXl() {
+  const r = await fetch('/api/xl/summary'); const d = await r.json();
+  // Bar chart: per-model SR at unified ref / 200k / 500k
+  const svg = document.getElementById('xl-bar');
+  svg.innerHTML = '';
+  const W = 800, H = 320, PAD = {l: 60, r: 20, t: 20, b: 60};
+  const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
+  // Y axis: 0..100
+  const ns = 'http://www.w3.org/2000/svg';
+  for (let y = 0; y <= 100; y += 20) {
+    const yp = PAD.t + innerH - innerH * y / 100;
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', PAD.l); line.setAttribute('x2', W - PAD.r);
+    line.setAttribute('y1', yp); line.setAttribute('y2', yp);
+    line.setAttribute('stroke', 'var(--rule)');
+    svg.appendChild(line);
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', PAD.l - 6); lbl.setAttribute('y', yp + 4);
+    lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('font-size', '11');
+    lbl.setAttribute('fill', 'var(--muted)');
+    lbl.textContent = y; svg.appendChild(lbl);
+  }
+  const models = d.models || [];
+  const groupCount = models.length || 1;
+  const groupW = innerW / groupCount;
+  const colors = ['#888', '#4a90e2', '#d0021b'];
+  const labels = ['canon_unified', 'canon_xl_200k', 'canon_xl_500k'];
+  models.forEach((m, gi) => {
+    const groupX = PAD.l + gi * groupW;
+    const refSR = (d.reference[m] || {}).SR;
+    const b200 = (d.bands.canon_xl_200k.find(x => x.model === m) || {}).SR;
+    const b500 = (d.bands.canon_xl_500k.find(x => x.model === m) || {}).SR;
+    const vals = [refSR, b200, b500];
+    const barW = groupW / 4;
+    vals.forEach((v, i) => {
+      if (v == null) return;
+      const x = groupX + (i + 0.5) * barW;
+      const yT = PAD.t + innerH - innerH * v / 100;
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('width', barW * 0.9);
+      rect.setAttribute('y', yT); rect.setAttribute('height', PAD.t + innerH - yT);
+      rect.setAttribute('fill', colors[i]);
+      svg.appendChild(rect);
+      const t = document.createElementNS(ns, 'text');
+      t.setAttribute('x', x + barW * 0.45); t.setAttribute('y', yT - 4);
+      t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '10');
+      t.setAttribute('fill', 'var(--text)');
+      t.textContent = v.toFixed(1);
+      svg.appendChild(t);
+    });
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', groupX + groupW / 2); lbl.setAttribute('y', H - 30);
+    lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '11');
+    lbl.setAttribute('fill', 'var(--text)');
+    lbl.textContent = m.replace('-preview', '').replace('-20251001', '');
+    svg.appendChild(lbl);
+  });
+  // Legend
+  labels.forEach((lab, i) => {
+    const lx = PAD.l + i * 220, ly = H - 10;
+    const sw = document.createElementNS(ns, 'rect');
+    sw.setAttribute('x', lx); sw.setAttribute('y', ly - 9);
+    sw.setAttribute('width', 12); sw.setAttribute('height', 10);
+    sw.setAttribute('fill', colors[i]); svg.appendChild(sw);
+    const lt = document.createElementNS(ns, 'text');
+    lt.setAttribute('x', lx + 16); lt.setAttribute('y', ly);
+    lt.setAttribute('font-size', '11'); lt.setAttribute('fill', 'var(--text)');
+    lt.textContent = lab; svg.appendChild(lt);
+  });
+  document.getElementById('xl-meta').textContent =
+    `${models.length} model(s) with XL data. Bar values are SR % on C-bearing variants.`;
+
+  // Paired McNemar table
+  const pt = document.getElementById('xl-paired-table');
+  pt.innerHTML = '<tr><th>Model</th><th>n paired</th>' +
+    '<th>both vigilant</th><th>200K only</th><th>500K only</th>' +
+    '<th>neither</th><th>200K÷500K failure ratio</th></tr>';
+  d.paired.forEach(p => {
+    const ratio = (p.only500 ? p.only200 / p.only500 : null);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${p.model}</td><td>${p.n}</td>` +
+      `<td>${p.both} (${(100*p.both/p.n).toFixed(1)}%)</td>` +
+      `<td>${p.only200} (${(100*p.only200/p.n).toFixed(1)}%)</td>` +
+      `<td>${p.only500} (${(100*p.only500/p.n).toFixed(1)}%)</td>` +
+      `<td>${p.neither} (${(100*p.neither/p.n).toFixed(1)}%)</td>` +
+      `<td>${ratio == null ? '—' : ratio.toFixed(2) + '×'}</td>`;
+    pt.appendChild(tr);
+  });
+
+  // Populate model selector + load row table
+  const sel = document.getElementById('xl-model-sel');
+  sel.innerHTML = '';
+  models.forEach(m => {
+    const o = document.createElement('option'); o.value = m; o.textContent = m;
+    sel.appendChild(o);
+  });
+  if (models.length) refreshXlRows();
+}
+async function refreshXlRows() {
+  const band = document.getElementById('xl-band-sel').value;
+  const model = document.getElementById('xl-model-sel').value;
+  const filter = document.getElementById('xl-filter-sel').value;
+  if (!model) return;
+  const r = await fetch(`/api/xl/rows?preset=${band}&model=${encodeURIComponent(model)}`);
+  const d = await r.json();
+  let items = d.items || [];
+  if (filter === 'failed') items = items.filter(it => ["C","A+C","B+C"].includes(it.evidence_variant) && !it.vigilance && !it.is_error);
+  else if (filter === 'passed') items = items.filter(it => ["C","A+C","B+C"].includes(it.evidence_variant) && it.vigilance);
+  else if (filter === 'errors') items = items.filter(it => it.is_error);
+  const t = document.getElementById('xl-rows-table');
+  t.innerHTML = '<tr><th>Scenario</th><th>Variant</th><th>Expected</th><th>Rec</th>' +
+    '<th>Vig</th><th>CM</th><th>MUE</th><th>FA</th><th>Excerpt</th></tr>';
+  items.forEach(it => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${it.scenario_id}</td><td>${it.evidence_variant}</td>` +
+      `<td>${it.expected||''}</td><td>${it.recommendation||''}</td>` +
+      `<td style="color:${it.vigilance?'green':'#888'}">${it.vigilance?'✓':'·'}</td>` +
+      `<td>${it.constraint_mentioned||''}</td>` +
+      `<td>${it.mentions_user_evidence||''}</td>` +
+      `<td>${it.false_alarm?'⚠':''}</td>` +
+      `<td style="font-size:10px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(it.excerpt||'').replace(/</g,'&lt;')}</td>`;
+    tr.addEventListener('click', () => loadXlRowDetail(it.idx));
+    t.appendChild(tr);
+  });
+  document.getElementById('xl-row-detail-wrap').style.display = 'none';
+}
+async function loadXlRowDetail(idx) {
+  const band = document.getElementById('xl-band-sel').value;
+  const model = document.getElementById('xl-model-sel').value;
+  const r = await fetch(`/api/xl/row?preset=${band}&model=${encodeURIComponent(model)}&idx=${idx}`);
+  const d = await r.json();
+  const wrap = document.getElementById('xl-row-detail-wrap');
+  const detail = document.getElementById('xl-row-detail');
+  wrap.style.display = '';
+  const sys = d.prompt && d.prompt.system_prompt || '(prompt not found)';
+  const user = d.prompt && d.prompt.user_message || '';
+  detail.innerHTML = `
+    <p><b>${d.scenario_id} / ${d.evidence_variant} / ${d.permutation}</b> &mdash;
+       expected=<code>${d.expected||''}</code>
+       recommended=<code>${d.recommendation||''}</code>
+       vigilance=<code>${d.vigilance?'1':'0'}</code>
+       CM=<code>${d.constraint_mentioned}</code>
+       MUE=<code>${d.mentions_user_evidence}</code>
+       FA=<code>${d.false_alarm?'1':'0'}</code>
+    </p>
+    <details open><summary>Model raw response</summary>
+      <pre style="white-space:pre-wrap;background:var(--accent-bg);padding:8px;font-size:11px;border-radius:4px;">${(d.raw_response||'').replace(/</g,'&lt;')}</pre>
+    </details>
+    <details><summary>Judge explanation</summary>
+      <pre style="white-space:pre-wrap;background:var(--accent-bg);padding:8px;font-size:11px;border-radius:4px;">${(d.judge_explanation||'').replace(/</g,'&lt;')}</pre>
+    </details>
+    <details><summary>System prompt (conversation history with constraint buried in)</summary>
+      <pre style="white-space:pre-wrap;background:var(--panel);padding:8px;font-size:10px;max-height:400px;overflow:auto;border-radius:4px;border:1px solid var(--rule);">${(sys+'\n\nUSER MESSAGE:\n'+user).replace(/</g,'&lt;').slice(0, 30000)}${sys.length+user.length>30000?'\n…(truncated for display)':''}</pre>
+    </details>
+  `;
+}
+['xl-band-sel','xl-model-sel','xl-filter-sel'].forEach(id =>
+  document.getElementById(id).addEventListener('change', refreshXlRows));
+
+// ─────────────────────────────────────────────────────────────
+// SR Surface tab — per-model length × depth heatmap
+// ─────────────────────────────────────────────────────────────
+async function refreshSurface() {
+  const r = await fetch('/api/models'); const m = await r.json();
+  const sel = document.getElementById('surface-model-sel');
+  if (sel.options.length === 0) {
+    (m.models || []).forEach(x => {
+      const o = document.createElement('option');
+      o.value = x.model; o.textContent = x.model_display;
+      sel.appendChild(o);
+    });
+  }
+  drawSurface();
+}
+async function drawSurface() {
+  const model = document.getElementById('surface-model-sel').value;
+  const nLen = document.getElementById('surface-nlen').value;
+  const nDep = document.getElementById('surface-ndep').value;
+  if (!model) return;
+  const r = await fetch(`/api/surface/data?model=${encodeURIComponent(model)}&n_len=${nLen}&n_dep=${nDep}`);
+  const d = await r.json();
+  const svg = document.getElementById('surface-svg');
+  svg.innerHTML = '';
+  if (d.error) {
+    document.getElementById('surface-meta').textContent = d.error;
+    return;
+  }
+  const W = 1000, H = 480, PAD = {l: 60, r: 100, t: 30, b: 60};
+  const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
+  const ns = 'http://www.w3.org/2000/svg';
+  const grid = d.grid;
+  const nDepRows = grid.length, nLenCols = grid[0].length;
+  const cellW = innerW / nLenCols, cellH = innerH / nDepRows;
+  // Color: SR < 0.4 red → SR 1.0 green
+  function srColor(sr) {
+    if (sr == null) return '#444';
+    const t = Math.max(0, Math.min(1, sr));
+    // hue 0 (red) at sr=0, 120 (green) at sr=1
+    const hue = t * 120;
+    return `hsl(${hue}, 70%, 50%)`;
+  }
+  for (let dy = 0; dy < nDepRows; dy++) {
+    for (let lx = 0; lx < nLenCols; lx++) {
+      const cell = grid[dy][lx];
+      const x = PAD.l + lx * cellW;
+      const y = PAD.t + (nDepRows - 1 - dy) * cellH;
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('y', y);
+      rect.setAttribute('width', cellW); rect.setAttribute('height', cellH);
+      rect.setAttribute('fill', srColor(cell.sr));
+      rect.setAttribute('stroke', 'var(--bg)');
+      svg.appendChild(rect);
+      if (cell.n > 0) {
+        const t = document.createElementNS(ns, 'text');
+        t.setAttribute('x', x + cellW / 2); t.setAttribute('y', y + cellH / 2 + 4);
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-size', '11'); t.setAttribute('fill', '#000');
+        t.textContent = `${(cell.sr * 100).toFixed(0)}%`;
+        svg.appendChild(t);
+        const t2 = document.createElementNS(ns, 'text');
+        t2.setAttribute('x', x + cellW / 2); t2.setAttribute('y', y + cellH / 2 + 16);
+        t2.setAttribute('text-anchor', 'middle');
+        t2.setAttribute('font-size', '9'); t2.setAttribute('fill', '#222');
+        t2.textContent = `n=${cell.n}`;
+        svg.appendChild(t2);
+      }
+    }
+  }
+  // Axes
+  const xLabel = document.createElementNS(ns, 'text');
+  xLabel.setAttribute('x', PAD.l + innerW / 2); xLabel.setAttribute('y', H - 10);
+  xLabel.setAttribute('text-anchor', 'middle'); xLabel.setAttribute('font-size', '12');
+  xLabel.setAttribute('fill', 'var(--text)');
+  xLabel.textContent = 'char_budget (log scale)';
+  svg.appendChild(xLabel);
+  const yLabel = document.createElementNS(ns, 'text');
+  yLabel.setAttribute('x', 15); yLabel.setAttribute('y', PAD.t + innerH / 2);
+  yLabel.setAttribute('transform', `rotate(-90 15 ${PAD.t + innerH / 2})`);
+  yLabel.setAttribute('text-anchor', 'middle'); yLabel.setAttribute('font-size', '12');
+  yLabel.setAttribute('fill', 'var(--text)');
+  yLabel.textContent = 'placement_frac (depth)';
+  svg.appendChild(yLabel);
+  // Length tick labels
+  d.len_edges.forEach((edge, i) => {
+    const x = PAD.l + (i / nLenCols) * innerW;
+    const t = document.createElementNS(ns, 'text');
+    t.setAttribute('x', x); t.setAttribute('y', PAD.t + innerH + 14);
+    t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '9');
+    t.setAttribute('fill', 'var(--muted)');
+    t.textContent = (edge / 1000).toFixed(0) + 'K';
+    svg.appendChild(t);
+  });
+  // Depth tick labels
+  for (let i = 0; i <= nDepRows; i++) {
+    const y = PAD.t + (nDepRows - i) * cellH;
+    const t = document.createElementNS(ns, 'text');
+    t.setAttribute('x', PAD.l - 6); t.setAttribute('y', y + 3);
+    t.setAttribute('text-anchor', 'end'); t.setAttribute('font-size', '9');
+    t.setAttribute('fill', 'var(--muted)');
+    t.textContent = (i / nDepRows).toFixed(2);
+    svg.appendChild(t);
+  }
+  // Color legend (right side)
+  const legX = W - PAD.r + 20, legY = PAD.t, legH = innerH;
+  const grad = document.createElementNS(ns, 'linearGradient');
+  grad.setAttribute('id', 'surface-grad');
+  grad.setAttribute('x1', '0'); grad.setAttribute('x2', '0');
+  grad.setAttribute('y1', '1'); grad.setAttribute('y2', '0');
+  for (let i = 0; i <= 10; i++) {
+    const s = document.createElementNS(ns, 'stop');
+    s.setAttribute('offset', `${i*10}%`); s.setAttribute('stop-color', srColor(i / 10));
+    grad.appendChild(s);
+  }
+  const defs = document.createElementNS(ns, 'defs'); defs.appendChild(grad);
+  svg.appendChild(defs);
+  const legRect = document.createElementNS(ns, 'rect');
+  legRect.setAttribute('x', legX); legRect.setAttribute('y', legY);
+  legRect.setAttribute('width', 16); legRect.setAttribute('height', legH);
+  legRect.setAttribute('fill', 'url(#surface-grad)');
+  svg.appendChild(legRect);
+  ['100%', '80%', '60%', '40%', '20%', '0%'].forEach((lbl, i) => {
+    const y = legY + (i / 5) * legH;
+    const t = document.createElementNS(ns, 'text');
+    t.setAttribute('x', legX + 22); t.setAttribute('y', y + 4);
+    t.setAttribute('font-size', '10'); t.setAttribute('fill', 'var(--muted)');
+    t.textContent = lbl;
+    svg.appendChild(t);
+  });
+  document.getElementById('surface-meta').textContent =
+    `Model ${model}: ${d.n_total} valid C-bearing rows. Greener = higher SR.`;
+}
+['surface-model-sel','surface-nlen','surface-ndep'].forEach(id =>
+  document.getElementById(id).addEventListener('change', drawSurface));
+
+// ─────────────────────────────────────────────────────────────
+// Frontier tab — per-model SR curves with threshold overlay
+// ─────────────────────────────────────────────────────────────
+async function refreshFrontier() {
+  drawFrontier();
+}
+async function drawFrontier() {
+  const thresh = document.getElementById('frontier-thresh').value;
+  document.getElementById('frontier-thresh-val').textContent = thresh;
+  const r = await fetch(`/api/frontier/data?threshold=${thresh}`);
+  const d = await r.json();
+  const ns = 'http://www.w3.org/2000/svg';
+  const palette = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+                   '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf'];
+  function drawCurves(svgId, key, xlabel, xLog) {
+    const svg = document.getElementById(svgId);
+    svg.innerHTML = '';
+    const W = 1000, H = (svgId === 'frontier-len-svg' ? 420 : 360);
+    const PAD = {l: 60, r: 220, t: 30, b: 50};
+    const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
+    // Axes
+    for (let y = 0; y <= 100; y += 20) {
+      const yp = PAD.t + innerH - innerH * y / 100;
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', PAD.l); line.setAttribute('x2', W - PAD.r);
+      line.setAttribute('y1', yp); line.setAttribute('y2', yp);
+      line.setAttribute('stroke', 'var(--rule)');
+      svg.appendChild(line);
+      const lbl = document.createElementNS(ns, 'text');
+      lbl.setAttribute('x', PAD.l - 6); lbl.setAttribute('y', yp + 4);
+      lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('font-size', '10');
+      lbl.setAttribute('fill', 'var(--muted)'); lbl.textContent = y;
+      svg.appendChild(lbl);
+    }
+    // Threshold line
+    const thY = PAD.t + innerH - innerH * thresh / 100;
+    const thL = document.createElementNS(ns, 'line');
+    thL.setAttribute('x1', PAD.l); thL.setAttribute('x2', W - PAD.r);
+    thL.setAttribute('y1', thY); thL.setAttribute('y2', thY);
+    thL.setAttribute('stroke', '#d0021b'); thL.setAttribute('stroke-width', '2');
+    thL.setAttribute('stroke-dasharray', '4,4');
+    svg.appendChild(thL);
+    const thLbl = document.createElementNS(ns, 'text');
+    thLbl.setAttribute('x', W - PAD.r + 4); thLbl.setAttribute('y', thY + 4);
+    thLbl.setAttribute('font-size', '11'); thLbl.setAttribute('fill', '#d0021b');
+    thLbl.textContent = `${thresh}% threshold`;
+    svg.appendChild(thLbl);
+    // Per-model curves
+    let xMin = Infinity, xMax = -Infinity;
+    d.models.forEach(m => {
+      m[key].forEach(p => {
+        if (p.sr == null) return;
+        xMin = Math.min(xMin, p.x); xMax = Math.max(xMax, p.x);
+      });
+    });
+    if (!isFinite(xMin)) return;
+    function xScale(v) {
+      if (xLog) {
+        const lmin = Math.log10(Math.max(1, xMin));
+        const lmax = Math.log10(Math.max(2, xMax));
+        return PAD.l + (Math.log10(Math.max(1, v)) - lmin) / (lmax - lmin) * innerW;
+      }
+      return PAD.l + (v - xMin) / (xMax - xMin) * innerW;
+    }
+    d.models.forEach((m, mi) => {
+      const color = palette[mi % palette.length];
+      const pts = m[key].filter(p => p.sr != null);
+      const path = pts.map((p, i) => {
+        const X = xScale(p.x); const Y = PAD.t + innerH - innerH * p.sr / 100;
+        return `${i === 0 ? 'M' : 'L'} ${X} ${Y}`;
+      }).join(' ');
+      const pathEl = document.createElementNS(ns, 'path');
+      pathEl.setAttribute('d', path); pathEl.setAttribute('stroke', color);
+      pathEl.setAttribute('stroke-width', '2'); pathEl.setAttribute('fill', 'none');
+      svg.appendChild(pathEl);
+      // dots
+      pts.forEach(p => {
+        const X = xScale(p.x); const Y = PAD.t + innerH - innerH * p.sr / 100;
+        const c = document.createElementNS(ns, 'circle');
+        c.setAttribute('cx', X); c.setAttribute('cy', Y); c.setAttribute('r', '3');
+        c.setAttribute('fill', color);
+        svg.appendChild(c);
+      });
+      // legend
+      const lx = W - PAD.r + 16, ly = PAD.t + 12 + mi * 18;
+      const sw = document.createElementNS(ns, 'rect');
+      sw.setAttribute('x', lx); sw.setAttribute('y', ly - 8);
+      sw.setAttribute('width', 12); sw.setAttribute('height', 10);
+      sw.setAttribute('fill', color); svg.appendChild(sw);
+      const lt = document.createElementNS(ns, 'text');
+      lt.setAttribute('x', lx + 16); lt.setAttribute('y', ly);
+      lt.setAttribute('font-size', '11'); lt.setAttribute('fill', 'var(--text)');
+      lt.textContent = m.model.replace('-preview','').replace('-20251001','') +
+        ` (${m.overall_sr}%)`;
+      svg.appendChild(lt);
+    });
+    // X axis label
+    const xL = document.createElementNS(ns, 'text');
+    xL.setAttribute('x', PAD.l + innerW / 2); xL.setAttribute('y', H - 10);
+    xL.setAttribute('text-anchor', 'middle'); xL.setAttribute('font-size', '12');
+    xL.setAttribute('fill', 'var(--text)'); xL.textContent = xlabel;
+    svg.appendChild(xL);
+  }
+  drawCurves('frontier-len-svg', 'length_curve', 'char_budget (log scale)', true);
+  drawCurves('frontier-dep-svg', 'depth_curve', 'placement_frac (depth)', false);
+  document.getElementById('frontier-meta').textContent =
+    `${d.models.length} models on canon_unified. Lines below the dashed line are below threshold.`;
+}
+document.getElementById('frontier-thresh').addEventListener('input', drawFrontier);
+
 </script>
 
 </body>

@@ -407,6 +407,7 @@ def mix(
     length_range: Optional[Tuple[int, int]] = None,
     include_constraint_inline: bool = False,
     c_only: bool = False,
+    single_perm_per_variant: bool = False,
     seed: int = ASSIGNMENT_SEED,
     condition_label: str = "mix",
     merge_gap_days: int = 1,
@@ -540,7 +541,13 @@ def mix(
     for sid in sorted(scenarios.keys()):
         scenario = scenarios[sid]
         for variant in variants:
-            for perm_label, seed_indices in enumerate_permutations(scenario, variant):
+            perms = enumerate_permutations(scenario, variant)
+            if single_perm_per_variant:
+                # Keep only the lexicographically-first permutation per
+                # (scenario, variant). Used by canon_xl_* presets to keep
+                # the prompt count to 85 × n_variants × 1 rep.
+                perms = [next(iter(perms))]
+            for perm_label, seed_indices in perms:
                 key = (sid, variant, perm_label)
                 triples.append(key)
                 triple_perms[key] = seed_indices
