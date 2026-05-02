@@ -145,7 +145,12 @@ def _gemini_response_to_result(line: dict[str, Any]) -> BatchResult:
     text = "".join(p.get("text", "") for p in parts)
     usage = resp.get("usageMetadata", {}) or {}
     in_tok = int(usage.get("promptTokenCount", 0) or 0)
-    out_tok = int(usage.get("candidatesTokenCount", 0) or 0)
+    # Gemini 3.x bills thinking tokens at the output rate (per
+    # ai.google.dev/gemini-api/docs/pricing — "Output price (including
+    # thinking tokens)"). candidatesTokenCount covers only visible
+    # output; thoughtsTokenCount covers internal reasoning. Sum both
+    # for accurate billing.
+    out_tok = int(usage.get("candidatesTokenCount", 0) or 0) + int(usage.get("thoughtsTokenCount", 0) or 0)
     finish = candidates[0].get("finishReason", "")
     or_shaped = {
         "id": cid,
@@ -290,7 +295,13 @@ class GeminiBatchAdapter:
         try:
             uploaded = self._client.files.upload(
                 file=tmp_path,
-                config={"display_name": display_name or "lcvb_batch_input.jsonl"},
+                config={
+                    "display_name": display_name or "lcvb_batch_input.jsonl",
+                    # The .jsonl extension isn't recognized by mimetypes
+                    # on Linux, so pass it explicitly. Google's batch
+                    # endpoint expects "application/jsonl".
+                    "mime_type": "application/jsonl",
+                },
             )
         finally:
             try:

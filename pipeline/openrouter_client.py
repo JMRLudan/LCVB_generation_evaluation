@@ -100,6 +100,35 @@ ANTHROPIC_TO_OR_PRICING_DEFAULT: dict[str, str] = {
     "claude-opus-4-7":             "anthropic/claude-opus-4.7",
 }
 
+# OpenAI / Gemini bare-slug → OpenRouter pricing-id maps. We use OR
+# only as a pricing oracle (real OpenAI/Gemini batch calls go to those
+# providers' native APIs); OR mirrors the upstream rates.
+OPENAI_TO_OR_PRICING_DEFAULT: dict[str, str] = {
+    # Verified 2026-05-01 against openai.com/api/pricing.
+    "gpt-5.5":        "openai/gpt-5.5",
+    "gpt-5.5-pro":    "openai/gpt-5.5-pro",
+    "gpt-5.4":        "openai/gpt-5.4",
+    "gpt-5.4-mini":   "openai/gpt-5.4-mini",
+    "gpt-5.4-nano":   "openai/gpt-5.4-nano",
+    "gpt-5.2":        "openai/gpt-5.2",
+    "gpt-5.1":        "openai/gpt-5.1",
+    "gpt-5":          "openai/gpt-5",
+    "gpt-5-mini":     "openai/gpt-5-mini",
+    "gpt-5-nano":     "openai/gpt-5-nano",
+    "gpt-5-pro":      "openai/gpt-5-pro",
+}
+
+GEMINI_TO_OR_PRICING_DEFAULT: dict[str, str] = {
+    # Verified 2026-05-02 against ai.google.dev/gemini-api/docs/pricing.
+    # All Gemini 3.x are currently in -preview state.
+    "gemini-3-flash-preview":        "google/gemini-3-flash-preview",
+    "gemini-3.1-pro-preview":        "google/gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview": "google/gemini-3.1-flash-lite-preview",
+    # Older 2.5 family (used in SVB-era runs)
+    "gemini-2.5-pro":                "google/gemini-2.5-pro",
+    "gemini-2.5-flash":              "google/gemini-2.5-flash",
+}
+
 COST_COLS = [
     "timestamp", "run_id", "model", "provider",
     "input_tokens", "output_tokens",
@@ -300,18 +329,41 @@ class OpenRouterClient:
     def _resolve_pricing_id(
         self, model: str, provider: str, or_pricing_id: str | None
     ) -> str:
-        """Returns the OpenRouter slug used to look up live prices."""
+        """Returns the OpenRouter slug used to look up live prices.
+
+        For native OpenAI/Gemini batches we still use OR as a pricing
+        oracle — OR mirrors the upstream rates and saves us from
+        scraping multiple pricing endpoints. Calls actually go to the
+        native APIs; only the price lookup is via OR.
+        """
         if or_pricing_id:
             return or_pricing_id
-        if provider == "openrouter":
+        if provider in ("openrouter", "anthropic_batch"):
             return model
-        # Anthropic native — translate to OR slug
-        mapped = self.anthropic_pricing_map.get(model)
+        if provider == "openrouter_batch":
+            return model
+        # Native-provider models — translate to OR slug.
+        if provider in ("anthropic",):
+            mapped = self.anthropic_pricing_map.get(model)
+            label = "Anthropic"
+            map_var = "ANTHROPIC_TO_OR_PRICING_DEFAULT"
+        elif provider in ("openai",):
+            mapped = OPENAI_TO_OR_PRICING_DEFAULT.get(model)
+            label = "OpenAI"
+            map_var = "OPENAI_TO_OR_PRICING_DEFAULT"
+        elif provider in ("gemini",):
+            mapped = GEMINI_TO_OR_PRICING_DEFAULT.get(model)
+            label = "Gemini"
+            map_var = "GEMINI_TO_OR_PRICING_DEFAULT"
+        else:
+            raise PricingFetchError(
+                f"Unknown provider '{provider}' for pricing lookup."
+            )
         if not mapped:
             raise PricingFetchError(
-                f"No OpenRouter pricing mapping for Anthropic model '{model}'. "
-                f"Either add it to ANTHROPIC_TO_OR_PRICING_DEFAULT (in this file) "
-                f"or pass `or_pricing_id='anthropic/...'` to complete()."
+                f"No OpenRouter pricing mapping for {label} model '{model}'. "
+                f"Either add it to {map_var} (in this file) "
+                f"or pass `or_pricing_id='<vendor>/...'` to complete()."
             )
         return mapped
 

@@ -67,9 +67,24 @@ def _request_to_openai_jsonl_record(req: BatchRequest) -> dict[str, Any]:
     body: dict[str, Any] = {
         "model": model,
         "messages": req.messages,
-        "max_tokens": req.max_tokens,
-        "temperature": req.temperature,
     }
+    # GPT-5 family quirks (verified 2026-05-01 against gpt-5-mini):
+    #   * `max_tokens` is rejected — must use `max_completion_tokens`.
+    #     We send `max_completion_tokens` for any gpt-5* model and
+    #     fall back to `max_tokens` for older 4.x ids.
+    #   * `temperature` is locked to the default 1.0; non-1.0 values
+    #     return "Unsupported value". We omit temperature for gpt-5*
+    #     when it's 1.0 (the default) and pass it through otherwise so
+    #     the API will surface a clear error rather than us silently
+    #     swallowing a non-default request.
+    is_gpt5 = model.startswith("gpt-5")
+    if is_gpt5:
+        body["max_completion_tokens"] = req.max_tokens
+        if abs(req.temperature - 1.0) > 1e-9:
+            body["temperature"] = req.temperature  # will error out — informative
+    else:
+        body["max_tokens"] = req.max_tokens
+        body["temperature"] = req.temperature
     body.update(req.extra_params)
     return {
         "custom_id": req.custom_id,
