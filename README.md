@@ -47,8 +47,12 @@ distribution](#data-distribution) below.
 git clone https://github.com/JMRLudan/LCVB_generation_evaluation.git
 cd LCVB_generation_evaluation
 
-# Download + extract the canonical data + prompts (~300MB)
-curl -OL https://github.com/JMRLudan/LCVB_generation_evaluation/releases/download/v1/lcvb-data-v1.tar.gz
+# Download the canonical data + prompts (~300MB, split into 4 parts).
+# Reassemble the tarball, then extract.
+BASE=https://github.com/JMRLudan/LCVB_generation_evaluation/releases/download/v1
+for i in 0 1 2 3; do curl -OL "$BASE/lcvb-data-v1.tar.gz.part$i"; done
+cat lcvb-data-v1.tar.gz.part0 lcvb-data-v1.tar.gz.part1 \
+    lcvb-data-v1.tar.gz.part2 lcvb-data-v1.tar.gz.part3 > lcvb-data-v1.tar.gz
 tar -xzvf lcvb-data-v1.tar.gz
 
 # Spin up the viewer
