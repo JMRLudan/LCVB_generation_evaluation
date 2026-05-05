@@ -100,7 +100,7 @@ def apply_judge_result(row: dict, parsed: dict, expected: str) -> None:
 async def rejudge_preset(
     preset: str, run_id: str, model: str, scenarios: dict,
     client: OpenRouterClient, sem: asyncio.Semaphore, max_retries: int,
-    dry_run: bool, include_all: bool = False,
+    dry_run: bool, include_all: bool = False, model_tag: str = "",
 ) -> dict:
     """Re-judge failed (or all) rows for one preset. Returns summary dict.
 
@@ -108,10 +108,27 @@ async def rejudge_preset(
         include_all: If True, re-judge every row whose subject succeeded
             (raw_response not starting with ERROR). Default False keeps the
             v1 behavior of touching only parse_error=1 rows.
+        model_tag:  optional suffix appended to the model dir (mirrors
+                    run.py's --model-tag). Lets this script find dirs like
+                    `qwen_qwen3.5-9b-reasoning-on/`.
+        run_id:     either an explicit run_id, or 'auto' to pick the most
+                    recent run dir under that model dir.
     """
     # Find the run dir. Model slug is stored on disk with '/' → '_'.
     model_fs = model.replace("/", "_")
-    run_dir = RUNS_DIR / preset / model_fs / run_id
+    if model_tag:
+        model_fs = f"{model_fs}-{model_tag}"
+    if run_id == "auto":
+        model_dir = RUNS_DIR / preset / model_fs
+        if not model_dir.exists():
+            return {"preset": preset, "status": "missing-model-dir", "path": str(model_dir)}
+        run_dirs = sorted([d for d in model_dir.iterdir() if d.is_dir()])
+        if not run_dirs:
+            return {"preset": preset, "status": "no-runs", "path": str(model_dir)}
+        run_dir = run_dirs[-1]   # most recent
+        run_id = run_dir.name
+    else:
+        run_dir = RUNS_DIR / preset / model_fs / run_id
     tsv_path = run_dir / "results.tsv"
     if not tsv_path.exists():
         return {"preset": preset, "status": "missing", "path": str(tsv_path)}
@@ -197,6 +214,15 @@ async def rejudge_preset(
     t0 = time.monotonic()
     tasks = [process(r) for r in failed]
     done = 0
+    def _flush_to_disk():
+        """Write current row state to disk so progress survives a kill."""
+        tmp = tsv_path.with_suffix(".tsv.rejudge_partial")
+        with open(tmp, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
+            writer.writeheader()
+            writer.writerows(rows)
+        tmp.replace(tsv_path)   # atomic on POSIX
+
     for coro in asyncio.as_completed(tasks):
         await coro
         done += 1
@@ -208,13 +234,9 @@ async def rejudge_preset(
                 f"elapsed={elapsed:.1f}s  cost={client.total_cost():.4f}",
                 flush=True,
             )
+            _flush_to_disk()   # checkpoint partial progress
 
-    # Rewrite TSV with updated rows (rows was modified in place; failed rows
-    # point at the same dicts).
-    with open(tsv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")
-        writer.writeheader()
-        writer.writerows(rows)
+    _flush_to_disk()
 
     summary["elapsed_s"] = round(time.monotonic() - t0, 1)
     return summary
@@ -234,12 +256,13 @@ async def main_async(args: argparse.Namespace) -> int:
         total_cost_start = client.total_cost()
 
         summaries = []
-        for preset in CANON_PRESETS:
+        active_presets = [p.strip() for p in args.presets.split(",") if p.strip()]
+        for preset in active_presets:
             print(f"\n=== {preset} ===")
             s = await rejudge_preset(
                 preset, args.run_id, args.model, scenarios,
                 client, sem, args.max_retries, args.dry_run,
-                include_all=args.all,
+                include_all=args.all, model_tag=args.model_tag,
             )
             print(f"  summary: {s}")
             summaries.append(s)
@@ -258,11 +281,23 @@ async def main_async(args: argparse.Namespace) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--run-id", required=True)
-    ap.add_argument("--model", default=JUDGE_MODEL)
+    ap.add_argument("--run-id", required=True,
+                    help="Explicit run_id, or 'auto' to pick the most recent.")
+    ap.add_argument("--model", default=JUDGE_MODEL,
+                    help="Subject model slug (used to find on-disk dir, NOT the judge).")
+    ap.add_argument("--model-tag", default="",
+                    help="Suffix appended to model dir (mirrors run.py --model-tag).")
     ap.add_argument("--concurrency", type=int, default=10)
     ap.add_argument("--max-retries", type=int, default=6)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--presets", default=",".join(CANON_PRESETS),
+        help=(
+            "Comma-separated list of presets to rejudge. Default: all 3 "
+            "canon presets. Restrict to e.g. 'canon_direct,canon_no_distractor' "
+            "to skip an in-progress canon_unified."
+        ),
+    )
     ap.add_argument(
         "--all", action="store_true",
         help=(

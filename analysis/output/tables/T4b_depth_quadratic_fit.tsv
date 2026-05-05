@@ -1,4 +1,0 @@
-model	intercept	se_int	linear	se_linear	quadratic	se_quadratic	shape_verdict	n_rows
-claude-haiku-4-5-20251001	-0.6603	0.0448	0.3377	0.1016	1.3171	0.3962	U-shape	4936
-claude-opus-4-7	1.4532	0.0548	0.2093	0.1285	0.4197	0.4977	no shape sig	4935
-claude-sonnet-4-6	0.6681	0.0455	0.2777	0.1067	0.8173	0.4137	U-shape	4928

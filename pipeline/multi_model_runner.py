@@ -91,6 +91,15 @@ THINKING_MODELS = {
 # Strings that indicate a transient (rate-limit / overload) error in the
 # wrapper's stringified exception. Kept conservative.
 _RATE_LIMIT_HINTS = ("rate", "429", "overloaded", "quota", "throttle")
+# Real account-budget exhaustion. Aborts the whole run because retrying
+# without topping up just spams the API.
+_INSUFFICIENT_CREDIT_HINTS = ("insufficient credits", "insufficient_quota")
+# Per-request token cap (account tier limit on OR — independent of
+# remaining credit balance). Returns HTTP 402 with "Prompt tokens limit
+# exceeded" message. NOT retryable, but NOT abort-worthy either: the
+# specific oversized prompt just gets skipped while the rest of the run
+# continues. Distinct from real credit exhaustion above.
+_PROMPT_TOO_LARGE_HINTS = ("prompt tokens limit exceeded",)
 
 
 def _is_rate_limited(err: str) -> bool:
@@ -101,6 +110,28 @@ def _is_rate_limited(err: str) -> bool:
 def _is_timeout(err: str) -> bool:
     s = (err or "").lower()
     return "timeout" in s or "timed out" in s
+
+
+def is_insufficient_credits(err: str) -> bool:
+    """Real account-budget exhaustion — aborts the whole run.
+
+    The OR API also returns HTTP 402 for per-request token-cap
+    rejections ('Prompt tokens limit exceeded') which are NOT credit
+    issues but tier limits. Those are caught separately by
+    `is_prompt_too_large()` and handled as a skip-this-row condition,
+    not an abort. Both messages contain '402' and the credits URL, so
+    we match on the specific phrase to disambiguate.
+    """
+    s = (err or "").lower()
+    if any(h in s for h in _PROMPT_TOO_LARGE_HINTS):
+        return False  # tier cap, not credit exhaustion
+    return any(h in s for h in _INSUFFICIENT_CREDIT_HINTS)
+
+
+def is_prompt_too_large(err: str) -> bool:
+    """OR per-request token-cap rejection — skip this row, continue run."""
+    s = (err or "").lower()
+    return any(h in s for h in _PROMPT_TOO_LARGE_HINTS)
 
 
 def _normalize_resp(raw: Dict, latency_ms: int) -> Dict:
@@ -132,7 +163,9 @@ async def openrouter_chat(
     user_message: str,
     max_retries: int = 8,
     temperature: float | None = None,
-    max_tokens: int = 10000,
+    max_tokens: int = 30000,
+    reasoning_mode: str = "default",
+    timeout: float = 1800.0,
 ) -> Dict:
     """Call an OpenRouter-routed model via the wrapper.
 
@@ -143,10 +176,21 @@ async def openrouter_chat(
     `temperature` defaults to module-level TEMPERATURE (1.0) when None,
     so callers can override per-condition (e.g., distractor uses 0.3).
 
-    `max_tokens` defaults to 10000 to give thinking-style models enough
-    room to both reason AND emit visible content, and to ensure normal
-    models never get cut off mid-response. Pay-per-token billing means
-    we only pay for what's emitted, so a generous ceiling is free.
+    `max_tokens` defaults to 30000 (raised 2026-05-04 from 10000 after
+    Stage-6 qwen3.5-9b smoke showed a bimodal completion-token
+    distribution with a 14–26% spike at the cap — the long thinking tail
+    of reasoning-capable models needs more headroom than 10K). Pay-per-
+    token billing means we only pay for what's emitted, so a generous
+    ceiling is free.
+
+    `reasoning_mode`:
+      - "default": no reasoning param sent — the model uses whatever
+        thinking behavior the provider ships as default. Stage-6 default
+        per `feedback_system_defaults_reasoning` memory.
+      - "off": send `reasoning={"enabled": False}` to suppress thinking.
+        Used only for explicit reasoning-on-vs-off ablations.
+      - "low": legacy alias for the THINKING_MODELS effort=low override
+        used by Stage-3/4/5; preserved for reproducibility of past runs.
     """
     messages = [
         {"role": "system", "content": system_prompt},
@@ -156,10 +200,13 @@ async def openrouter_chat(
         "max_tokens": max_tokens,
         "temperature": TEMPERATURE if temperature is None else temperature,
     }
-    if model in THINKING_MODELS:
-        # Thinking models still get reasoning effort=low; the max_tokens
-        # budget is already 10k by default so no override needed.
+    if reasoning_mode == "off":
+        model_params["reasoning"] = {"enabled": False}
+    elif reasoning_mode == "low" or (reasoning_mode == "default" and model in THINKING_MODELS):
+        # Legacy path: Stage-3/4/5 used effort=low for THINKING_MODELS.
+        # Kept default-on for those slugs to preserve historical behavior.
         model_params["reasoning"] = {"effort": "low"}
+    # else "default" with model not in THINKING_MODELS → no reasoning param
 
     for attempt in range(max_retries):
         t0 = time.monotonic()
@@ -169,7 +216,7 @@ async def openrouter_chat(
                 messages=messages,
                 model_params=model_params,
                 provider="openrouter",
-                timeout=180.0,
+                timeout=timeout,
             )
             latency = int((time.monotonic() - t0) * 1000)
             return _normalize_resp(raw, latency)

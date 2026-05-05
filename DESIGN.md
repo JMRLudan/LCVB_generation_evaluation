@@ -104,8 +104,10 @@ variants × ~5 average perms ≈ **2 122 items**, broken down as 248 (`C`)
 **Layer 2 — mixer-level permutations.** Given an `(scenario_id,
 variant, scenario_perm)` item, the mixer decides:
 
-- Which distractor hash(es) to pull from the 99-pool (per-draw,
-  per-slot shuffle; balanced usage).
+- Which distractor hash(es) to pull from the distractor pool (per-draw,
+  per-slot shuffle; balanced usage). The pool size is read at runtime
+  from `data/distractors/index.json` (94 conversations as of the
+  shipped canon).
 - At what normalized depth(s) to insert evidence (fixed list or
   stratified sample).
 - Against which char budget(s) to truncate.
@@ -198,9 +200,10 @@ haystack size.
 
 ## What this design *does not* control
 
-- **The distractor pool content.** The 99 distractor conversations in
-  `data/distractors/` are fixed artifacts — synthesized upstream and
-  deduplicated. The mixer picks from the pool but does not generate
+- **The distractor pool content.** The distractor conversations in
+  `data/distractors/` (94 in the shipped canon) are fixed artifacts —
+  synthesized upstream and deduplicated. The mixer picks from the pool
+  but does not generate
   new chat content. Consequence: phrases like "Got it." or "I see."
   that appear organically inside distractors show up in rendered
   prompts, regardless of what `DEFAULT_ACKS` is set to. Evidence-ack

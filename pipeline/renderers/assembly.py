@@ -61,12 +61,12 @@ RESUMPTION_PREFIXES = [
 ]
 
 # NOTE: We deliberately do NOT emit any chat-boundary marker between
-# stitched distractor chunks. The pool itself is 99 pre-assembled
-# conversations (see JOURNAL.md 2026-05-01 — distractor pool audit), so
-# inserting a divider only at our concat seams while leaving the pool's
-# internal stitch points unmarked would assert a topology we don't have.
-# The reader sees the merged stream as one ongoing log, which matches
-# what we actually know about it.
+# stitched distractor chunks. The pool entries are themselves
+# pre-assembled multi-topic conversations, so inserting a divider only
+# at our concat seams while leaving the pool's internal stitch points
+# unmarked would assert a topology we don't have. The reader sees the
+# merged stream as one ongoing log, which matches what we actually know
+# about it.
 
 
 def _stable_index(parts: Sequence[str], n: int) -> int:

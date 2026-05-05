@@ -187,13 +187,19 @@ def _coerce_bool(v: Any) -> bool:
     return v in ("1", 1, True, "True", "true")
 
 
-def _load_run(model: str, run_id: str) -> dict:
-    """Load + parse a single canon_unified results.tsv. Cached."""
-    key = (model, run_id)
+def _load_run(model: str, run_id: str, preset: str = CONDITION) -> dict:
+    """Load + parse a single results.tsv. Cached.
+
+    `preset` defaults to canon_unified (the headline view) but can be
+    overridden by Scenario-tab endpoints to load canon_direct or
+    canon_no_distractor instead. Cache key includes preset so flipping
+    presets in the UI doesn't poison the canon_unified cache.
+    """
+    key = (model, run_id, preset)
     if key in _RESULTS_CACHE:
         return _RESULTS_CACHE[key]
 
-    tsv = RUNS_DIR / CONDITION / model.replace("/", "_") / run_id / "results.tsv"
+    tsv = RUNS_DIR / preset / model.replace("/", "_") / run_id / "results.tsv"
     if not tsv.exists():
         return {"rows": [], "fields": [], "tsv": str(tsv)}
 
@@ -245,7 +251,21 @@ def _load_run(model: str, run_id: str) -> dict:
             r["_domain_full"] = full
             r["_domain_pre"] = prefix
             r["_risk_level"] = sc.get("risk_level", "")
-            md = pm.get((sid, r.get("evidence_variant", ""), r.get("permutation", "")), {})
+            perm_raw = r.get("permutation", "")
+            md = pm.get((sid, r.get("evidence_variant", ""), perm_raw), {})
+            if not md and "-d" not in perm_raw:
+                # Fallback: results from `run.py` (Stage-6 qwen smoke) wrote
+                # the BARE permutation (`c0_a0`) instead of the suffixed
+                # form (`c0_a0-d0-l0`). For canon_unified, the 3 draw
+                # variants share the base perm, so we can't pick the exact
+                # resample. Use the first matching draw_idx=0 / length_idx=0
+                # entry as a best-effort approximation. Charts based on
+                # placement_frac / char_budget will be approximate for
+                # such runs (a footnote in the writeup is appropriate).
+                fallback_key = (sid, r.get("evidence_variant",""), f"{perm_raw}-d0-l0")
+                md = pm.get(fallback_key, {})
+                if md:
+                    r["_perm_join_approximate"] = True
             try:
                 r["placement_frac"] = float(md["placement_frac"]) if "placement_frac" in md else None
             except (TypeError, ValueError):
@@ -304,14 +324,29 @@ def _list_models() -> list[dict[str, Any]]:
     return out
 
 
-def _resolve_run_id(model: str, run_id: str | None) -> str | None:
-    """If run_id is missing, pick the latest run for this model."""
+def _resolve_run_id(model: str, run_id: str | None, preset: str = CONDITION) -> str | None:
+    """If run_id is missing, pick the latest run for this (model, preset).
+
+    For presets other than the headline canon_unified, we walk the
+    on-disk dir directly since `_list_models()` is canon_unified-only.
+    """
     if run_id:
         return run_id
-    for m in _list_models():
-        if m["model"] == model:
-            return m["latest_run_id"]
-    return None
+    if preset == CONDITION:
+        # Fast path: use the cached _list_models()
+        for m in _list_models():
+            if m["model"] == model:
+                return m["latest_run_id"]
+        return None
+    # Slow path: scan the preset's dir
+    model_dir = RUNS_DIR / preset / model.replace("/", "_")
+    if not model_dir.exists():
+        return None
+    runs = sorted(
+        [d for d in model_dir.iterdir() if d.is_dir() and (d / "results.tsv").exists()],
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    )
+    return runs[0].name if runs else None
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -428,11 +463,47 @@ def _no_dist_baseline(model: str, stat: str,
 # Stat helpers
 # ──────────────────────────────────────────────────────────────────────
 def _stat_for_rows(stat: str, rows: list[dict]) -> tuple[int, int]:
-    """Return (numerator, denominator) for a STAT given a row slice."""
+    """Return (numerator, denominator) for a STAT given a row slice
+    (instance-averaged / micro-averaged)."""
     sd = STAT_DEFS[stat]
     num = sum(1 for r in rows if r[sd["num"]])
     den = sum(1 for r in rows if r[sd["denom"]])
     return num, den
+
+
+def _macro_avg_pct(rows: list[dict], num_field: str, denom_field: str) -> float | None:
+    """Scenario-macro-averaged percentage:
+        1. Group rows by scenario_id.
+        2. Compute per-scenario rate = sum(num)/sum(denom) for each scenario
+           (skip scenarios with denom == 0).
+        3. Return the simple mean of per-scenario rates (×100).
+
+    This is what the project uses as the "scenario-averaged" or
+    "macro-averaged" headline metric — gives equal weight to every
+    scenario regardless of how many rows it has, so a scenario with
+    75 rows doesn't dominate one with 50.
+
+    Returns None if no scenario contributes.
+    """
+    by_scen: dict[str, dict[str, int]] = {}
+    for r in rows:
+        sid = r.get("scenario_id") or "?"
+        s = by_scen.setdefault(sid, {"num": 0, "den": 0})
+        if r[denom_field]:
+            s["den"] += 1
+            if r[num_field]:
+                s["num"] += 1
+    rates = [s["num"] / s["den"] for s in by_scen.values() if s["den"] > 0]
+    if not rates:
+        return None
+    return 100 * sum(rates) / len(rates)
+
+
+def _stat_macro_for_rows(stat: str, rows: list[dict]) -> float | None:
+    """Scenario-macro-averaged version of _stat_for_rows.
+    Returns the percentage directly (or None when no scenario contributes)."""
+    sd = STAT_DEFS[stat]
+    return _macro_avg_pct(rows, sd["num"], sd["denom"])
 
 
 def _filter_rows_for_stat(rows: list[dict], stat: str,
@@ -540,30 +611,32 @@ def api_results_summary():
 
     def pct(n, d): return round(100 * n / d, 2) if d else None
 
+    # ─── Per-variant metrics — scenario-macro-averaged so seed/resample
+    # balances don't overweight some scenarios. For each variant we
+    # restrict rows to that variant and macro-average over scenarios.
     variants_summary = []
     for v in ("C", "A+C", "B+C", "A", "B"):
-        if v not in by_v: continue
-        e = by_v[v]
+        v_rows = [r for r in rows if r.get("evidence_variant") == v]
+        if not v_rows: continue
         variants_summary.append({
             "variant": v,
-            "n": e["n"],
-            "SR": pct(e["vig"], e["vig_set"]),
-            "GF": pct(e["gf"], e["vig_set"]),
-            "CM": pct(e["cm"], e["cm_set"]),
-            "FA": pct(e["fa"], e["fa_set"]),
-            "MUE": pct(e["mue"], e["mue_set"]),
-            "PM": pct(e["pm"], e["pm_set"]),
-            "abstain": pct(e["abstain"], e["vig_set"]),
+            "n": len(v_rows),
+            "SR":  _macro_avg_pct(v_rows, "_vigilance",   "_vig_set"),
+            "GF":  _macro_avg_pct(v_rows, "_general_flag","_vig_set"),
+            "CM":  _macro_avg_pct(v_rows, "_cm",          "_cm_set"),
+            "FA":  _macro_avg_pct(v_rows, "_false_alarm", "_vig_set_ab"),
+            "MUE": _macro_avg_pct(v_rows, "_mue",         "_mue_set"),
+            "PM":  _macro_avg_pct(v_rows, "_pref_match",  "_pref_set"),
+            "abstain": _macro_avg_pct(v_rows, "_abstained","_vig_set"),
         })
     out["variants"] = variants_summary
 
-    # Aggregates over variant slices that match each STAT
+    # ─── Overall — macro-averaged within the STAT's valid_variants subset
     all_rows = rows
     out["overall"] = {}
     for stat in STAT_DEFS:
         sub = _filter_rows_for_stat(all_rows, stat)
-        n, d = _stat_for_rows(stat, sub)
-        out["overall"][stat] = pct(n, d)
+        out["overall"][stat] = _stat_macro_for_rows(stat, sub)
 
     return jsonify(out)
 
@@ -935,10 +1008,14 @@ def api_prompt():
 # ───── results: paginated rows + single ───────────────────────────────
 @app.route("/api/results/rows")
 def api_results_rows():
-    """Paginated row inspector for canon_unified. Filterable by scenario_id,
-    evidence_variant, parse_error, errored, has_baseline_match."""
+    """Paginated row inspector. Defaults to canon_unified; the Scenario
+    tab can override via `preset=canon_direct|canon_no_distractor`.
+    Filterable by scenario_id, evidence_variant, parse_error, errored."""
     model = request.args.get("model", "")
-    run_id = _resolve_run_id(model, request.args.get("run_id"))
+    preset = request.args.get("preset", CONDITION)
+    if preset not in ("canon_direct", "canon_no_distractor", "canon_unified"):
+        preset = CONDITION
+    run_id = _resolve_run_id(model, request.args.get("run_id"), preset)
     if not (model and run_id):
         abort(400, description="missing model/run_id")
 
@@ -953,7 +1030,7 @@ def api_results_rows():
         offset, limit = 0, 100
     limit = max(1, min(1000, limit))
 
-    data = _load_run(model, run_id)
+    data = _load_run(model, run_id, preset)
     rows = data["rows"]
     if sid: rows = [r for r in rows if r.get("scenario_id") == sid]
     if ev:  rows = [r for r in rows if r.get("evidence_variant") == ev]
@@ -996,11 +1073,18 @@ def api_results_rows():
 _PERM_DRAW_LEN_RE = re.compile(r"^(.*?)-d(\d+)(?:-l(\d+))?$")
 
 
-def _prompt_file_for_row(sid: str, ev: str, perm_full: str) -> Path | None:
-    """Recover the generated/canon_unified/<filename>.json that was used
+def _prompt_file_for_row(sid: str, ev: str, perm_full: str,
+                         preset: str = CONDITION) -> Path | None:
+    """Recover the generated/<preset>/<filename>.json that was used
     to produce a results-row. The row's `permutation` column is the
     runner's ``"<base_perm>-d<draw>[-l<length>]"`` string; the filename
-    follows ``"<sid>_<ev>_<base_perm>_d<draw>[_L<length>].json"``."""
+    follows ``"<sid>_<ev>_<base_perm>_d<draw>[_L<length>].json"``.
+
+    Different presets store prompts in different subdirectories of
+    ``generated/`` — canon_direct + canon_no_distractor have
+    ``_d<draw>.json`` (no ``_L`` suffix because there is no length
+    variation), and canon_unified has both ``_d<draw>`` and ``_L<L>``.
+    """
     m = _PERM_DRAW_LEN_RE.match(perm_full)
     if not m:
         # Bare perm (no draw/length suffix) — fall back to just _d0
@@ -1013,11 +1097,11 @@ def _prompt_file_for_row(sid: str, ev: str, perm_full: str) -> Path | None:
     if length is not None:
         cand += f"_L{length}"
     cand += ".json"
-    p = GENERATED_DIR / CONDITION / cand
+    p = GENERATED_DIR / preset / cand
     if p.exists():
         return p
     # Fallback: glob, since some renderer paths add a `_P` index too.
-    matches = list((GENERATED_DIR / CONDITION).glob(f"{sid}_{ev}_{base}_d{draw}*.json"))
+    matches = list((GENERATED_DIR / preset).glob(f"{sid}_{ev}_{base}_d{draw}*.json"))
     return matches[0] if matches else None
 
 
@@ -1025,19 +1109,30 @@ def _prompt_file_for_row(sid: str, ev: str, perm_full: str) -> Path | None:
 def api_results_row():
     """Single row with full raw_response + judge explanation + the
     underlying prompt (system_prompt, user_message, metadata) so a
-    reviewer doesn't have to context-switch to the Prompts tab."""
+    reviewer doesn't have to context-switch to the Prompts tab.
+
+    For TSVs where the (sid, ev, perm) triple isn't unique (e.g. the
+    qwen3.5-9b canon_unified resamples), an optional `raw_prefix` arg
+    disambiguates by matching the start of the row's raw_response.
+    """
     model = request.args.get("model", "")
-    run_id = _resolve_run_id(model, request.args.get("run_id"))
+    preset = request.args.get("preset", CONDITION)
+    if preset not in ("canon_direct", "canon_no_distractor", "canon_unified"):
+        preset = CONDITION
+    run_id = _resolve_run_id(model, request.args.get("run_id"), preset)
     sid = request.args.get("scenario_id", "")
     ev = request.args.get("evidence_variant", "")
     perm = request.args.get("permutation", "")
+    raw_prefix = request.args.get("raw_prefix", "")
     if not (model and run_id and sid and ev and perm):
         abort(400, description="missing one of model/run_id/scenario_id/evidence_variant/permutation")
-    data = _load_run(model, run_id)
+    data = _load_run(model, run_id, preset)
     for r in data["rows"]:
         if (r.get("scenario_id") == sid
                 and r.get("evidence_variant") == ev
-                and r.get("permutation") == perm):
+                and r.get("permutation") == perm
+                and (not raw_prefix
+                     or (r.get("raw_response") or "").startswith(raw_prefix))):
             payload = {
                 "scenario_id": sid, "evidence_variant": ev, "permutation": perm,
                 "expected_answer": r.get("expected_answer"),
@@ -1060,7 +1155,7 @@ def api_results_row():
                 "char_budget": r.get("char_budget"),
                 "placement_frac": r.get("placement_frac"),
             }
-            pf = _prompt_file_for_row(sid, ev, perm)
+            pf = _prompt_file_for_row(sid, ev, perm, preset=preset)
             if pf is not None:
                 try:
                     with open(pf) as f:
@@ -2470,14 +2565,17 @@ def api_scenarios():
     for n. None values always sort last.
     """
     model = request.args.get("model", "")
-    run_id = _resolve_run_id(model, request.args.get("run_id"))
+    preset = request.args.get("preset", CONDITION)
+    if preset not in ("canon_direct", "canon_no_distractor", "canon_unified"):
+        preset = CONDITION
+    run_id = _resolve_run_id(model, request.args.get("run_id"), preset)
     sort = request.args.get("sort", "scenario_id")
     direction = request.args.get("direction", "")
     scenarios = _load_scenarios()
 
     out_rows = []
     if model and run_id:
-        data = _load_run(model, run_id)
+        data = _load_run(model, run_id, preset)
         per_scen: dict[str, dict] = {}
         for r in data["rows"]:
             if r["_is_error"]:
@@ -2586,7 +2684,10 @@ def api_scenario():
     breakdown for the current (model, run)."""
     sid = request.args.get("id", "")
     model = request.args.get("model", "")
-    run_id = _resolve_run_id(model, request.args.get("run_id"))
+    preset = request.args.get("preset", CONDITION)
+    if preset not in ("canon_direct", "canon_no_distractor", "canon_unified"):
+        preset = CONDITION
+    run_id = _resolve_run_id(model, request.args.get("run_id"), preset)
     if not sid:
         abort(400, description="missing id")
     scenarios = _load_scenarios()
@@ -2615,7 +2716,7 @@ def api_scenario():
 
     # Per-variant result breakdown for this scenario in the current run
     if model and run_id:
-        data = _load_run(model, run_id)
+        data = _load_run(model, run_id, preset)
         rows = [r for r in data["rows"]
                 if r.get("scenario_id") == sid and not r["_is_error"]]
         by_v: dict[str, dict] = {}
@@ -2925,6 +3026,99 @@ def surface_data():
 # ──────────────────────────────────────────────────────────────────────
 # Frontier (overlay of per-model SR-threshold contours)
 # ──────────────────────────────────────────────────────────────────────
+def _stage_for_model(m: str) -> tuple[int, str]:
+    """Bucket a model dir name into (stage_order, stage_label) for grouping
+    in cross-model views. Stages match the canon's launch chronology."""
+    ml = m.lower()
+    if "haiku" in ml:                       return (1, "Stage 1 — Haiku canon")
+    if "sonnet" in ml or "opus" in ml:      return (2, "Stage 2 — Anthropic frontier")
+    if "gpt-5" in ml or "openai" in ml:     return (3, "Stage 3 — OpenAI")
+    if "gemini" in ml or "google" in ml:    return (4, "Stage 4 — Gemini")
+    if "qwen" in ml:                        return (6, "Stage 6 — Qwen open-source")
+    return (9, "Other")
+
+
+@app.route("/api/frontier/baseline_vs_unified")
+def frontier_baseline_vs_unified():
+    """Per-model SR/CM/MUE on canon_unified (bars) and canon_no_distractor
+    (markers/stars), grouped by stage, for the Frontier tab's
+    baseline-vs-vigilance grouped-bar chart.
+
+    Excludes ERROR rows and parse_error rows. Computes a clean SR%, CM%,
+    MUE% per (model, preset) using the same conventions as the rest of
+    the viewer.
+    """
+    # Per-metric valid_variants (matches STAT_DEFS used by the Charts tab)
+    SR_VARIANTS = {"C", "A+C", "B+C"}
+    CM_VARIANTS = {"C", "A+C", "B+C", "A", "B"}
+    MUE_VARIANTS = {"C", "A+C", "B+C"}
+
+    out: list[dict] = []
+    for entry in _list_models():
+        m = entry["model"]; run_id = entry["latest_run_id"]
+        rows = _load_run(m, run_id).get("rows", [])
+        rows = [r for r in rows if not r["_is_error"]]
+        if not rows: continue
+
+        # canon_unified (bars) — scenario-macro-averaged within each
+        # metric's valid_variants subset. Matches Charts tab convention.
+        sr_rows  = [r for r in rows if r.get("evidence_variant") in SR_VARIANTS]
+        cm_rows  = [r for r in rows if r.get("evidence_variant") in CM_VARIANTS]
+        mue_rows = [r for r in rows if r.get("evidence_variant") in MUE_VARIANTS]
+        sr_u  = _macro_avg_pct(sr_rows,  "_vigilance", "_vig_set")
+        cm_u  = _macro_avg_pct(cm_rows,  "_cm",        "_cm_set")
+        mue_u = _macro_avg_pct(mue_rows, "_mue",       "_mue_set")
+
+        # canon_no_distractor (markers) — same macro-average treatment.
+        # Need to first hydrate boolean fields the way _load_run does.
+        nd_rows_raw = _load_no_dist_run(m) or []
+        nd_rows_raw = [r for r in nd_rows_raw
+                       if not (r.get("raw_response","") or "").startswith(("ERROR", '"ERROR'))]
+        if nd_rows_raw:
+            for r in nd_rows_raw:
+                r.setdefault("_is_error",
+                    (r.get("raw_response","") or "").startswith(("ERROR", '"ERROR')))
+                r.setdefault("_vigilance", _coerce_bool(r.get("vigilance")))
+                r.setdefault("_vig_set",
+                    r.get("vigilance") not in ("", None) and not r["_is_error"])
+                cm = (r.get("constraint_mentioned") or "").strip().upper()
+                r.setdefault("_cm_set", cm in ("YES", "NO"))
+                r.setdefault("_cm", cm == "YES")
+                mue = (r.get("mentions_user_evidence") or "").strip().upper()
+                r.setdefault("_mue_set", mue in ("YES", "NO"))
+                r.setdefault("_mue", mue == "YES")
+            sr_nd_rows  = [r for r in nd_rows_raw if r.get("evidence_variant") in SR_VARIANTS]
+            cm_nd_rows  = [r for r in nd_rows_raw if r.get("evidence_variant") in CM_VARIANTS]
+            mue_nd_rows = [r for r in nd_rows_raw if r.get("evidence_variant") in MUE_VARIANTS]
+            sr_nd  = _macro_avg_pct(sr_nd_rows,  "_vigilance", "_vig_set")
+            cm_nd  = _macro_avg_pct(cm_nd_rows,  "_cm",        "_cm_set")
+            mue_nd = _macro_avg_pct(mue_nd_rows, "_mue",       "_mue_set")
+            n_nd = len(nd_rows_raw)
+        else:
+            sr_nd = cm_nd = mue_nd = None
+            n_nd = 0
+        n_u = len(rows)
+
+        stage_order, stage_label = _stage_for_model(m)
+        out.append({
+            "model": m,
+            "model_display": _pretty_model(m) if _pretty_model(m) != m else m,
+            "stage_order": stage_order, "stage_label": stage_label,
+            "n_unified": n_u, "n_no_dist": n_nd,
+            "unified":  {"SR": sr_u,  "CM": cm_u,  "MUE": mue_u},
+            "no_dist":  {"SR": sr_nd, "CM": cm_nd, "MUE": mue_nd},
+        })
+    # Round to 2 decimals for display (None preserved)
+    for entry_out in out:
+        for d in (entry_out["unified"], entry_out["no_dist"]):
+            for k, v in list(d.items()):
+                if v is not None:
+                    d[k] = round(v, 2)
+    # Sort: stage order, then unified SR descending (None values last)
+    out.sort(key=lambda r: (r["stage_order"], -(r["unified"]["SR"] or -1)))
+    return jsonify({"models": out})
+
+
 @app.route("/api/frontier/data")
 def frontier_data():
     """For each model with canon_unified data, compute the binned

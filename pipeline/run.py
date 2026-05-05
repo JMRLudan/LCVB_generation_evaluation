@@ -38,7 +38,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 csv.field_size_limit(sys.maxsize)
 
-from eval_pipeline import EvalItem, score_result  # noqa: E402
+from eval_pipeline import (  # noqa: E402
+    EvalItem, score_result,
+    load_scenarios, SCENARIOS_TSV,
+    get_constraint_grounding_seeds, enumerate_permutations,
+)
 from openrouter_client import OpenRouterClient  # noqa: E402
 from multi_model_runner import (  # noqa: E402
     openrouter_chat, anthropic_chat, judge_response, item_key,
@@ -54,13 +58,26 @@ RUNS_DIR = BASE_DIR / "data" / "runs"
 # regression checks and for reproducing per-scenario judge verdicts. Override
 # via --temperature if a stochastic eval is wanted (e.g. measuring response
 # variance for a single prompt).
-DEFAULT_TEMPERATURE = 0.0
+DEFAULT_TEMPERATURE = 1.0   # 2026-05-04: aligned with batch_runner + multi_model_runner
+                            # (Stage-2/3/4/5 batch runs all used T=1.0; the 0.0 default
+                            # here was an inconsistency that put today's qwen3.5-9b smoke
+                            # off the rest of the canon. The judge uses its own
+                            # eval_pipeline.TEMPERATURE = 0.0 unaffected by this change.)
 
 
 def load_items_from_dir(prompts_dir: Path) -> List[EvalItem]:
     """Load EvalItems from a flat directory of *.json prompt files.
 
     Skips `manifest.json` if present.
+
+    Permutation handling: for canon_unified (multi-resample preset), the
+    bare `permutation` field (e.g. `c0_a0`) is shared across the 3 draw
+    variants per (scenario, variant, base_perm). To match the format that
+    `batch_runner.write_results_tsv` produces — and that the viewer's
+    prompt-meta lookup expects — we append `-d{draw_idx}-l{length_idx}`
+    when those metadata fields are present. Without this suffix, the
+    viewer can't join results to placement_frac/char_budget and the
+    chart endpoints return empty.
     """
     items = []
     for fp in sorted(prompts_dir.glob("*.json")):
@@ -68,10 +85,18 @@ def load_items_from_dir(prompts_dir: Path) -> List[EvalItem]:
             continue
         d = json.loads(fp.read_text())
         m = d["metadata"]
+        base_perm = str(m["permutation"])
+        di = m.get("draw_idx")
+        li = m.get("length_idx")
+        full_perm = base_perm
+        if di is not None:
+            full_perm += f"-d{di}"
+        if li is not None:
+            full_perm += f"-l{li}"
         items.append(EvalItem(
             scenario_id=m["scenario_id"],
             evidence_variant=m["evidence_variant"],
-            permutation=m["permutation"],
+            permutation=full_perm,
             expected_answer=m.get("expected_answer", "C"),
             system_prompt=d["system_prompt"],
             messages=[{"role": "user", "content": d["user_message"]}],
@@ -94,8 +119,16 @@ async def run(
     concurrency: int = 10,
     temperature: float = DEFAULT_TEMPERATURE,
     cost_abort: float = 0.0,
+    reasoning_mode: str = "default",
+    model_tag: str = "",
+    max_tokens: int = 30000,
 ):
-    cond_dir = runs_dir / condition / model_slug.replace("/", "_") / run_id
+    # `model_tag` is appended to the model dir name (NOT to the API call's
+    # model slug). Used to keep two runs of the same model under separate
+    # viewer dirs (e.g. reasoning-on vs reasoning-off).
+    base_dir_name = model_slug.replace("/", "_")
+    dir_name = f"{base_dir_name}-{model_tag}" if model_tag else base_dir_name
+    cond_dir = runs_dir / condition / dir_name / run_id
     cond_dir.mkdir(parents=True, exist_ok=True)
 
     checkpoint_path = cond_dir / "checkpoint.txt"
@@ -136,10 +169,34 @@ async def run(
     t_start = time.monotonic()
     aborted = False
 
+    # Pre-load scenarios so we can re-derive evidence_seeds per item for
+    # the with_analysis judge mode (mirrors what rejudge_failed.py does).
+    # Without these seeds the judge sees "(none)" for user-stated facts
+    # and MUE comes back nonsensical even on with_analysis runs.
+    scenarios_by_id = load_scenarios(SCENARIOS_TSV, validated_only=True)
+
+    def _evidence_seeds_for(item: EvalItem) -> list[str]:
+        scenario = scenarios_by_id.get(item.scenario_id)
+        if not scenario:
+            return []
+        # Strip the -d{n}-l{n} suffix to get the base perm label that
+        # enumerate_permutations returns.
+        base_perm = item.permutation.split("-", 1)[0] if "-" in item.permutation else item.permutation
+        for perm_l, idx in enumerate_permutations(scenario, item.evidence_variant):
+            if perm_l == base_perm:
+                return get_constraint_grounding_seeds(scenario, item.evidence_variant, idx)
+        return []
+
+    # Schema MUST stay in sync with batch_runner.write_results_tsv —
+    # particularly the mentions_user_evidence column added 2026-04-30
+    # for the with_analysis judge mode. Without this column here, the
+    # judge's MUE field gets silently dropped on the run.py path and the
+    # viewer's MUE chart breaks for any model that ran via run.py.
     fieldnames = [
         "run_id", "condition", "scenario_id", "evidence_variant", "permutation",
         "expected_answer", "raw_response", "recommendation", "flagged",
-        "constraint_mentioned", "heavily_modified", "explanation",
+        "constraint_mentioned", "heavily_modified", "mentions_user_evidence",
+        "explanation",
         "parse_error", "vigilance", "general_flag", "false_alarm",
         "choice_correct", "abstained", "input_tokens", "output_tokens",
         "judge_input_tokens", "judge_output_tokens", "latency_ms",
@@ -182,9 +239,24 @@ async def run(
                                 item.system_prompt,
                                 item.messages[0]["content"],
                                 temperature=temperature,
+                                reasoning_mode=reasoning_mode,
+                                max_tokens=max_tokens,
                             )
 
                         if resp.get("error"):
+                            # Hard-stop on insufficient credits — retrying just
+                            # spams the API and writes thousands of garbage rows
+                            # without making progress.
+                            from multi_model_runner import is_insufficient_credits
+                            if is_insufficient_credits(resp.get("error", "")):
+                                aborted = True
+                                print(
+                                    f"\n✗ ABORT: insufficient credits on {model_slug}. "
+                                    f"Top up at https://openrouter.ai/settings/credits "
+                                    f"and resume with --run-id {run_id}.",
+                                    file=sys.stderr,
+                                )
+                                return
                             errors += 1
                             row = {
                                 "run_id": run_id, "condition": condition,
@@ -196,6 +268,7 @@ async def run(
                                 "recommendation": None, "flagged": None,
                                 "constraint_mentioned": None,
                                 "heavily_modified": None,
+                                "mentions_user_evidence": None,
                                 "explanation": None, "parse_error": True,
                                 "vigilance": None, "general_flag": None,
                                 "false_alarm": None, "choice_correct": None,
@@ -210,6 +283,7 @@ async def run(
                                 client, resp["content"],
                                 item.query_with_options,
                                 item.constraint_description,
+                                evidence_seeds=_evidence_seeds_for(item),
                             )
                             scores = score_result(parsed, item.expected_answer)
                             row = {
@@ -225,6 +299,8 @@ async def run(
                                     parsed.get("constraint_mentioned"),
                                 "heavily_modified":
                                     parsed.get("heavily_modified"),
+                                "mentions_user_evidence":
+                                    parsed.get("mentions_user_evidence"),
                                 "explanation": parsed.get("explanation"),
                                 "parse_error": parsed.get("parse_error", False),
                                 "vigilance": scores["vigilance"],
@@ -333,6 +409,33 @@ def main():
             "populates the mentions_user_evidence column; pure_eval leaves it blank."
         ),
     )
+    ap.add_argument(
+        "--max-tokens", type=int, default=30000,
+        help="Max output tokens per call (default 30000). Pass smaller "
+             "to enforce a tighter cap (e.g. 10000 to reproduce the "
+             "Stage-2/3/4 cap regime).",
+    )
+    ap.add_argument(
+        "--reasoning",
+        choices=["default", "off", "low"],
+        default="default",
+        help=(
+            "Reasoning/thinking mode for OpenRouter-routed models. "
+            "'default' (recommended for headline runs) sends no reasoning "
+            "param so the model uses its system default. 'off' injects "
+            "reasoning={'enabled': False} to suppress thinking — used "
+            "only for explicit ablations. 'low' is the legacy "
+            "effort=low override used in Stage-3/4/5."
+        ),
+    )
+    ap.add_argument(
+        "--model-tag", type=str, default="",
+        help=(
+            "Optional suffix appended to the model directory name (NOT to "
+            "the API call). Use to keep runs of the same model under "
+            "separate viewer dirs, e.g. 'reasoning-on' vs 'reasoning-off'."
+        ),
+    )
     ap.add_argument("--run", action="store_true",
                     help="Actually execute (without this flag it's a dry run).")
     args = ap.parse_args()
@@ -371,6 +474,9 @@ def main():
         concurrency=args.concurrency,
         temperature=args.temperature,
         cost_abort=args.cost_abort,
+        reasoning_mode=args.reasoning,
+        model_tag=args.model_tag,
+        max_tokens=args.max_tokens,
     ))
 
 

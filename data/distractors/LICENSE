@@ -1,0 +1,37 @@
+# LCVB distractor pool — licensing
+
+The 94 conversational `*.json` files in this directory are the
+distractor pool used by the LCVB benchmark to produce
+`canon_unified` prompts. They are **not** original LCVB content; they
+are curated transformations of pre-existing publicly-available
+conversational chat data.
+
+## Two distinct rights apply
+
+1. **Source data.** The underlying conversation text is from public
+   conversational datasets. Whatever per-source licensing terms applied
+   to those original conversations continue to apply to the text inside
+   each `*.json` file. Inclusion of those conversations in this pool
+   does not modify, override, or relicense the source data. If you
+   intend to redistribute or commercially use the underlying chat
+   content, consult the original source's license terms.
+
+2. **LCVB curation.** The work performed on top of the source data —
+   selection, deduplication, contamination filtering against the
+   benchmark's evidence seeds, JSON normalization, and pool indexing —
+   is the project's own contribution. That curation layer is released
+   under **CC-BY-4.0**. Attribution should reference this repository.
+
+## Provenance
+
+`index.json` is the canonical inventory of pool entries. `provenance.tsv`
+records which distractor groups were assigned to each scenario. Neither
+file claims to identify the original publishing source of any
+particular conversation; that lookup, if needed, is downstream of LCVB.
+
+## No warranty
+
+This pool is provided as-is for evaluation research. The LCVB project
+makes no representation about the suitability of any individual
+conversation in the pool for any purpose other than serving as
+distractor context in this benchmark.

@@ -1,0 +1,10 @@
+# LCVB runtime dependencies. Mirrors pyproject.toml so users who prefer
+# `pip install -r requirements.txt` over `pip install -e .` get the same
+# environment. See pyproject.toml for the canonical version pins.
+
+# Core pipeline (rendering, evaluation, batch adapters)
+anthropic>=0.40.0
+aiohttp>=3.9.0
+
+# Viewer (only needed if you plan to run `python3 viewer/app.py`)
+flask>=3.0

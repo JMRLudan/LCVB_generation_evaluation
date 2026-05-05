@@ -3,29 +3,48 @@
 .env.*
 !.env.example
 
-# Generated prompt files (reproducible — built by render_*.py)
+# Generated prompt files — distributed via the data tarball
+# (lcvb-data-v1.tar.gz on GitHub releases), not via git
 generated/
 
-# Run outputs (results + checkpoints)
+# The data tarball itself — produced at repo root by
+# scripts/build_data_tarball.sh. Published as a GitHub release artifact.
+lcvb-data-*.tar.gz
+
+# Run outputs — results + checkpoints, distributed via the data tarball
 data/runs/
 pipeline/api_logs/
 
-# Archived Haiku-era data (canon_direct + canon_no_distractor results
-# and prompt sets, pre-2026-05-01 unified-canon refactor). Large,
-# run-specific, not part of the public benchmark surface.
-data/archive_canon_direct_*/
-data/archive_canon_no_distractor_*/
-data/archive_pre_unified_*/
+# Archives of all kinds (recovery traces, pre-canon-rename data,
+# stage-specific snapshots, etc.) — never tracked
+data/archive_*/
+data/runs_*INVALID*/
+data/runs_*SCRUBBED*/
 data/runs_pilot/
-archive_unstratified_*/
+archive_*/
 
-# Per-run batch-API manifests (Anthropic Messages Batches batch_ids).
-# These are tied to our specific Stage-1 + Stage-2 runs.
+# Per-run batch-API manifests (provider batch_ids — ephemeral)
 batch_manifests/
 
-# Curation artifact that references internal run_ids — re-generate
-# locally with the subagent prompts in JOURNAL.md.
-analysis/output/trend_examples.json
+# Per-run wall logs (machine-specific timestamps + paths)
+logs/
+
+# Internal research artifacts not for public release
+JOURNAL.md
+CLAUDE.md
+analysis/
+
+# In-place TSV patch backups (created by rejudge_failed.py and
+# batch_judge.py; safe to discard once the patch is verified)
+*.pre_rejudge_*
+*.pre_batchjudge_*
+*.before_clean_*
+*.before_recover_*
+*.before_30kcap_*
+
+# Outside-archives sibling dir (anything moved here is intentionally
+# excluded — should never be a subpath of the repo, but defensive)
+_lcvb_outside_archives/
 
 # Python
 __pycache__/
@@ -44,6 +63,8 @@ env/
 .vscode/
 .idea/
 *.swp
+.ipynb_checkpoints/
+Thumbs.db
 
 # Test / coverage
 .pytest_cache/

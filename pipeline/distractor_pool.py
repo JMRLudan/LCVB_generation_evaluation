@@ -17,14 +17,16 @@ Each distractor JSON has schema:
       "provenance": list
     }
 
-Construction invariants (also documented in the project memory and in the
-top-level README) that every renderer in this repo MUST satisfy:
+Construction invariants (also documented in the top-level README) that
+every renderer in this repo MUST satisfy:
 
   - **No two scenarios share the same distractor within a single draw.**
-    The pool currently holds 96 deduplicated distractor groups (post
-    2026-05-01 LCVB-substring strip — see JOURNAL.md). With 85 scenarios,
-    each draw is a 1-to-1 assignment using an 85-subset of the pool.
-    Pool size is read dynamically from index.json, not hard-coded.
+    The pool currently holds 94 deduplicated distractor groups (after
+    the 2026-05-01 LCVB-substring strip — distractors that contained
+    any verbatim seed text from a scenario were removed to prevent
+    contamination). With 85 scenarios, each draw is a 1-to-1
+    assignment using an 85-subset of the pool. Pool size is read
+    dynamically from index.json, not hard-coded.
   - **Deterministic assignment seed: 4232026.** For draw index `d`, the
     permutation is `random.Random(4232026 + d).sample(all_hashes,
     len(all_hashes))` and scenario `scenarios_sorted[i]` is assigned

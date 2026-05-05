@@ -102,6 +102,11 @@
     border-color: var(--accent); font-weight: 600;
   }
   .tab-btn:hover:not(.active) { background: var(--accent-bg); }
+  .small-btn {
+    font-size: 11px; padding: 3px 10px; border-radius: 4px;
+    border: 1px solid #cbd5e1; background: #f8fafc; cursor: pointer;
+  }
+  .small-btn:hover { background: #e2e8f0; }
   body[data-tab="charts"]    .scenarios-only,
   body[data-tab="charts"]    .results-only,
   body[data-tab="charts"]    .prompts-only,
@@ -535,6 +540,17 @@
     color: var(--muted); max-width: 130px; overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* Macro-average footer row — visually distinct from the scrollable
+     scenario rows above so it reads as an aggregate, not as a row. */
+  table.scen-table tfoot tr.scen-avg-row td {
+    border-top: 2px solid var(--rule);
+    background: var(--accent-bg);
+    font-weight: 500;
+    position: sticky; bottom: 0;
+  }
+  table.scen-table tfoot tr.scen-avg-row td .muted {
+    color: var(--muted); font-weight: 400; font-size: 11px;
+  }
 
   .scen-detail {
     background: var(--panel); border: 1px solid var(--rule);
@@ -697,9 +713,6 @@
   <button class="tab-btn" data-tab="scenarios">Scenarios</button>
   <button class="tab-btn" data-tab="results">Results</button>
   <button class="tab-btn" data-tab="prompts">Prompts</button>
-  <button class="tab-btn" data-tab="paper">Paper tables &amp; analyses</button>
-  <button class="tab-btn" data-tab="tables">Tables (cross-model)</button>
-  <button class="tab-btn" data-tab="trends">Trends</button>
   <button class="tab-btn" data-tab="xl">XL (long-context)</button>
   <button class="tab-btn" data-tab="surface">SR Surface</button>
   <button class="tab-btn" data-tab="frontier">Frontier</button>
@@ -761,8 +774,15 @@
 
 <div class="scen-grid scenarios-only">
   <div class="scen-list-wrap">
-    <div class="scen-controls">
-      <span id="scen-list-meta" style="color: var(--muted)"></span>
+    <div class="scen-controls" style="flex-wrap: wrap; gap: 6px; align-items: center;">
+      <label style="font-size: 11px; color: var(--muted);">Preset</label>
+      <select id="scen-preset-sel" style="font-size: 11px;">
+        <option value="canon_unified">canon_unified (vigilance test)</option>
+        <option value="canon_no_distractor">canon_no_distractor (light test)</option>
+        <option value="canon_direct">canon_direct (constraint inline)</option>
+      </select>
+      <button id="scen-random-btn" class="small-btn" title="Pick a random scenario">🎲 Random</button>
+      <span id="scen-list-meta" style="color: var(--muted); margin-left: auto;"></span>
     </div>
     <div class="scen-list" id="scen-list"></div>
   </div>
@@ -787,6 +807,7 @@
       </select>
       <label><input id="res-show-err" type="checkbox" checked /> errors</label>
       <label><input id="res-show-pe" type="checkbox" checked /> parse-err</label>
+      <button id="res-random-btn" class="small-btn" title="Pick a random row">🎲 Random row</button>
       <span id="res-meta" style="color: var(--muted); margin-left: auto;"></span>
     </div>
     <div id="res-list"></div>
@@ -846,6 +867,7 @@
         <option value="A">A</option>
         <option value="B">B</option>
       </select>
+      <button id="pmt-random-btn" class="small-btn" title="Pick a random prompt">🎲 Random prompt</button>
       <span id="pmt-meta" style="color: var(--muted); margin-left: auto;"></span>
     </div>
     <div id="pmt-list"></div>
@@ -867,6 +889,15 @@
      XL tab — Flash long-context experiment (200K + 500K)
      ════════════════════════════════════════════════════════════════════ -->
 <div class="xl-only">
+  <div class="panel full" style="background: #fef3c7; border-left: 4px solid #f59e0b;">
+    <p style="margin: 0; color: #92400e; font-size: 13px;">
+      <strong>Exploratory data only.</strong> The XL bands (canon_xl_200k,
+      canon_xl_500k) were a Stage-5 pilot run on a single model
+      (gemini-3-flash-preview). Other models do not have XL data on disk;
+      this tab is preserved as scaffolding for future long-context
+      extensions but is NOT part of the canonical Stage 1–6 results.
+    </p>
+  </div>
   <div class="panel full">
     <h2>SR vs prompt length (Flash long-context experiment)</h2>
     <p class="panel-sub">
@@ -940,26 +971,71 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════════════════
-     Frontier tab — per-model SR-vs-length curves with threshold overlay
+     Frontier tab — baseline-vs-vigilance bar chart, then per-model
+     SR-vs-length / SR-vs-depth curves side by side with model toggling
      ════════════════════════════════════════════════════════════════════ -->
 <div class="frontier-only">
   <div class="panel full">
-    <h2>Vigilance frontier — where each model crosses below threshold</h2>
+    <h2>Baseline vs vigilance — SR / CM / MUE per model (grouped by stage)</h2>
     <p class="panel-sub">
-      One line per model showing SR vs char_budget on a log axis.
-      Horizontal threshold line marks where SR drops below the chosen
-      cut-off. Where each model's curve dips below the line is its
-      operational frontier.
+      Bars = canon_unified (vigilance test, distractors buried).
+      Stars (★) = canon_no_distractor (light test). Models grouped by
+      launch stage; stage dividers shown. Y-axis pinned 0–100%.
     </p>
-    <div class="toolbar" style="margin-bottom: 8px;">
-      <label>SR threshold (%)</label>
-      <input type="range" id="frontier-thresh" min="50" max="95" value="80"
-             style="width: 200px;" />
-      <span id="frontier-thresh-val">80</span>%
+    <div class="toolbar" style="margin-bottom: 8px; gap: 18px; flex-wrap: wrap;">
+      <span><label style="margin-right:6px;">Show metrics:</label>
+        <label><input type="checkbox" id="bvg-met-SR"  checked /> SR</label>
+        <label><input type="checkbox" id="bvg-met-CM"          /> CM</label>
+        <label><input type="checkbox" id="bvg-met-MUE"         /> MUE</label>
+      </span>
+      <span><label style="margin-right:6px;">Sort by:</label>
+        <select id="bvg-sort">
+          <option value="stage">Stage (grouped)</option>
+          <option value="unified_SR_desc">Unified SR ↓</option>
+          <option value="unified_SR_asc">Unified SR ↑</option>
+          <option value="nodist_SR_desc">No-dist SR ↓</option>
+          <option value="gap_SR_desc">Vigilance gap SR (no-dist − unified) ↓</option>
+          <option value="unified_CM_desc">Unified CM ↓</option>
+          <option value="unified_MUE_desc">Unified MUE ↓</option>
+          <option value="name_asc">Model name A→Z</option>
+        </select>
+      </span>
     </div>
-    <div class="chart-wrap"><svg id="frontier-len-svg" viewBox="0 0 1000 420"></svg></div>
-    <h3 style="margin-top: 18px;">SR vs depth (averaged over length)</h3>
-    <div class="chart-wrap"><svg id="frontier-dep-svg" viewBox="0 0 1000 360"></svg></div>
+    <div class="chart-wrap"><svg id="frontier-bvg-svg" viewBox="0 0 1400 620"></svg></div>
+    <p class="small-meta" id="frontier-bvg-meta"></p>
+  </div>
+  <div class="panel full" style="margin-top: 18px;">
+    <h2>SR vs prompt length / SR vs depth — canon_unified, C-bearing variants</h2>
+    <p class="panel-sub">
+      One line per model. Click a model name to toggle its visibility on
+      both charts. Y-axis pinned 0–100%.
+    </p>
+    <div class="toolbar" style="margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+      <button id="frontier-show-all" class="small-btn">Show all</button>
+      <button id="frontier-hide-all" class="small-btn">Hide all</button>
+      <span id="frontier-model-toggles" style="display: flex; flex-wrap: wrap; gap: 4px 10px;"></span>
+    </div>
+    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+      <div class="chart-wrap" style="flex: 1; min-width: 480px;">
+        <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;">
+          <h3 id="frontier-len-title" style="margin: 0; font-size: 13px;">SR vs char_budget (log scale)</h3>
+          <span style="font-size: 11px; color: var(--muted);">x-axis:</span>
+          <label style="font-size: 11px; cursor: pointer;">
+            <input type="radio" name="frontier-len-scale" id="frontier-len-scale-log" value="log" checked />
+            log
+          </label>
+          <label style="font-size: 11px; cursor: pointer;">
+            <input type="radio" name="frontier-len-scale" id="frontier-len-scale-linear" value="linear" />
+            linear
+          </label>
+        </div>
+        <svg id="frontier-len-svg" viewBox="0 0 720 380"></svg>
+      </div>
+      <div class="chart-wrap" style="flex: 1; min-width: 480px;">
+        <h3 style="margin: 0 0 4px 0; font-size: 13px;">SR vs depth (placement_frac)</h3>
+        <svg id="frontier-dep-svg" viewBox="0 0 720 380"></svg>
+      </div>
+    </div>
     <p class="small-meta" id="frontier-meta"></p>
   </div>
 </div>
@@ -992,6 +1068,8 @@ let state = {
   pmt_selected: null,
   // Scenario detail row browser
   scen_rows_offset: 0, scen_rows_limit: 50,
+  scen_preset: 'canon_unified',
+  scen_list_cache: [],   // last loaded scenario list (for the random-jump button)
   scen_rows_ev: '',
   scen_rows_selected: null,
   // Paper tab
@@ -1393,9 +1471,11 @@ function setTab(tab) {
   if (tab === 'scenarios') refreshScenariosList();
   if (tab === 'results')   refreshResultsList();
   if (tab === 'prompts')   refreshPromptsList();
-  if (tab === 'paper')     refreshPaperList();
-  if (tab === 'tables')    refreshTables();
-  if (tab === 'trends')    refreshTrends();
+  // Tabs paper/tables/trends were removed in 2026-05-04 cleanup —
+  // their dispatchers are unreachable so we omit them here. The
+  // underlying refresh* functions and Python /api/paper, /api/tables,
+  // /api/trends endpoints are kept on disk as legacy code, callable
+  // only by direct URL access.
   if (tab === 'xl')        refreshXl();
   if (tab === 'surface')   refreshSurface();
   if (tab === 'frontier')  refreshFrontier();
@@ -1770,12 +1850,43 @@ if (_scenSortStub) _scenSortStub.addEventListener('change', e => {
   refreshScenariosList();
 });
 
+// Preset selector for the Scenarios tab
+const _scenPresetSel = document.getElementById('scen-preset-sel');
+if (_scenPresetSel) _scenPresetSel.addEventListener('change', e => {
+  state.scen_preset = e.target.value;
+  // Clear the inner row selection since rows differ per preset
+  state.scen_rows_selected = null;
+  state.scen_rows_offset = 0;
+  refreshScenariosList();
+  if (state.selected_sid) {
+    refreshScenarioDetail();
+    refreshScenarioRows();
+  }
+});
+
+// Random-jump button on the Scenarios tab
+const _scenRandomBtn = document.getElementById('scen-random-btn');
+if (_scenRandomBtn) _scenRandomBtn.addEventListener('click', () => {
+  if (!state.scen_list_cache || state.scen_list_cache.length === 0) return;
+  const pick = state.scen_list_cache[Math.floor(Math.random() * state.scen_list_cache.length)];
+  if (pick && pick.scenario_id) {
+    state.selected_sid = pick.scenario_id;
+    state.scen_rows_offset = 0;
+    state.scen_rows_selected = null;
+    refreshScenariosList();   // re-renders to highlight the picked row
+    refreshScenarioDetail();
+    refreshScenarioRows();
+  }
+});
+
 // ─────────────────────────────────────────────────────────────
 // Scenarios tab
 // ─────────────────────────────────────────────────────────────
 async function refreshScenariosList() {
   if (!state.model) return;
+  const preset = state.scen_preset || 'canon_unified';
   const url = '/api/scenarios?model=' + encodeURIComponent(state.model)
+    + '&preset=' + encodeURIComponent(preset)
     + '&sort=' + state.scen_sort
     + '&direction=' + state.scen_dir;
   const r = await fetch(url);
@@ -1783,8 +1894,9 @@ async function refreshScenariosList() {
   const meta = document.getElementById('scen-list-meta');
   if (!r.ok) { list.innerHTML = ''; meta.textContent = 'Error ' + r.status; return; }
   const d = await r.json();
+  state.scen_list_cache = d.scenarios || [];   // for the random-jump button
   meta.textContent = d.n_scenarios + ' scenarios · sort: ' +
-    state.scen_sort + ' (' + d.direction + ')';
+    state.scen_sort + ' (' + d.direction + ') · preset: ' + (state.scen_preset || 'canon_unified');
   list.innerHTML = '';
 
   // Sortable column definitions: [field, header label, default-direction]
@@ -1864,6 +1976,43 @@ async function refreshScenariosList() {
     tbody.appendChild(tr);
   }
   tbl.appendChild(tbody);
+
+  // Footer — macro-average across the loaded scenarios. Each metric's
+  // mean is computed only over scenarios with a defined value (null
+  // means the metric isn't applicable for that scenario, e.g. SR / CM
+  // are null for no-constraint-only filters; FA is null for C-only).
+  const tfoot = document.createElement('tfoot');
+  const trF = document.createElement('tr');
+  trF.className = 'scen-avg-row';
+  function macroMean(field) {
+    const vals = (d.scenarios || [])
+      .map(s => s[field])
+      .filter(v => v !== null && v !== undefined && !Number.isNaN(v));
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  }
+  function fmtAvg(v) {
+    if (v === null || v === undefined) return '—';
+    return v.toFixed(1) + '%';
+  }
+  const totalN = (d.scenarios || []).reduce((a, s) => a + (s.n || 0), 0);
+  const avgCells = [
+    '<strong>Macro avg</strong>',
+    '<span class="muted">(' + (d.scenarios || []).length + ' scen)</span>',
+    String(totalN),
+    fmtAvg(macroMean('SR')),
+    fmtAvg(macroMean('GF')),
+    fmtAvg(macroMean('CM')),
+    fmtAvg(macroMean('FA')),
+    fmtAvg(macroMean('PM')),
+    fmtAvg(macroMean('MUE')),
+    fmtAvg(macroMean('abstain')),
+  ];
+  for (const c of avgCells) {
+    const td = document.createElement('td'); td.innerHTML = c; trF.appendChild(td);
+  }
+  tfoot.appendChild(trF);
+  tbl.appendChild(tfoot);
   list.appendChild(tbl);
 }
 
@@ -1874,7 +2023,8 @@ async function refreshScenarioDetail() {
     return;
   }
   const url = '/api/scenario?id=' + encodeURIComponent(state.selected_sid)
-    + '&model=' + encodeURIComponent(state.model);
+    + '&model=' + encodeURIComponent(state.model)
+    + '&preset=' + encodeURIComponent(state.scen_preset || 'canon_unified');
   const r = await fetch(url);
   if (!r.ok) {
     detail.innerHTML = '<div class="scen-empty">Error ' + r.status + '</div>';
@@ -1977,6 +2127,7 @@ async function refreshScenarioRows() {
   if (!list) return; // detail panel not rendered yet
   const params = new URLSearchParams({
     model: state.model,
+    preset: state.scen_preset || 'canon_unified',
     scenario_id: state.selected_sid,
     offset: state.scen_rows_offset,
     limit: state.scen_rows_limit,
@@ -1994,7 +2145,8 @@ async function refreshScenarioRows() {
     el.className = 'res-row';
     if (state.scen_rows_selected
         && state.scen_rows_selected.evidence_variant === row.evidence_variant
-        && state.scen_rows_selected.permutation === row.permutation) {
+        && state.scen_rows_selected.permutation === row.permutation
+        && state.scen_rows_selected.raw_response_preview === row.raw_response_preview) {
       el.classList.add('selected');
     }
     let badge = '';
@@ -2011,6 +2163,7 @@ async function refreshScenarioRows() {
       state.scen_rows_selected = {
         evidence_variant: row.evidence_variant,
         permutation: row.permutation,
+        raw_response_preview: row.raw_response_preview,
       };
       refreshScenarioRows();
       refreshScenarioRowDetail();
@@ -2051,10 +2204,15 @@ async function refreshScenarioRowDetail() {
   const sel = state.scen_rows_selected;
   const params = new URLSearchParams({
     model: state.model,
+    preset: state.scen_preset || 'canon_unified',
     scenario_id: state.selected_sid,
     evidence_variant: sel.evidence_variant,
     permutation: sel.permutation,
   });
+  // Disambiguate when 3 resamples share the same (sid,ev,perm).
+  if (sel.raw_response_preview) {
+    params.set('raw_prefix', sel.raw_response_preview);
+  }
   const r = await fetch('/api/results/row?' + params.toString());
   if (!r.ok) {
     target.innerHTML = '<div class="scen-empty">Error ' + r.status + '</div>';
@@ -2164,13 +2322,20 @@ async function refreshResultsList() {
   const d = await r.json();
   meta.textContent = 'showing ' + d.rows.length + ' of ' + d.total.toLocaleString();
   list.innerHTML = '';
+  // Some result TSVs (e.g. qwen3.5-9b canon_unified) have 3 rows per
+  // (scenario_id, evidence_variant, permutation) tuple — different
+  // distractor resamples that all share the bare permutation key. To
+  // disambiguate them in the row picker, we include the
+  // raw_response_preview as a tiebreaker (each resample produces a
+  // different response, so the preview text is unique per row).
   for (const row of d.rows) {
     const el = document.createElement('div');
     el.className = 'res-row';
     if (state.res_selected
         && state.res_selected.scenario_id === row.scenario_id
         && state.res_selected.evidence_variant === row.evidence_variant
-        && state.res_selected.permutation === row.permutation) {
+        && state.res_selected.permutation === row.permutation
+        && state.res_selected.raw_response_preview === row.raw_response_preview) {
       el.classList.add('selected');
     }
     let badge = '';
@@ -2187,6 +2352,7 @@ async function refreshResultsList() {
         scenario_id: row.scenario_id,
         evidence_variant: row.evidence_variant,
         permutation: row.permutation,
+        raw_response_preview: row.raw_response_preview,
       };
       refreshResultsList();
       refreshResultsDetail();
@@ -2232,6 +2398,12 @@ async function refreshResultsDetail() {
     evidence_variant: sel.evidence_variant,
     permutation: sel.permutation,
   });
+  // Disambiguate when 3 resamples share the same (sid,ev,perm) — qwen
+  // canon_unified rows. The preview is the first ~80 chars of
+  // raw_response; the API filters by startswith() to pick the right row.
+  if (sel.raw_response_preview) {
+    params.set('raw_prefix', sel.raw_response_preview);
+  }
   const r = await fetch('/api/results/row?' + params.toString());
   if (!r.ok) {
     detail.innerHTML = '<div class="scen-empty">Error ' + r.status + '</div>';
@@ -2383,6 +2555,54 @@ document.getElementById('res-show-pe').addEventListener('change', e => {
   state.res_offset = 0; refreshResultsList();
 });
 
+// Random-row jump button on the Results tab. Strategy: hit the same
+// /api/results/rows endpoint to learn `total` under current filters,
+// pick a uniform random row index in [0, total), align res_offset to a
+// page boundary so the picked row appears in the list, then re-render
+// and pre-select it. Falls back silently if no model selected or total=0.
+const _resRandomBtn = document.getElementById('res-random-btn');
+if (_resRandomBtn) _resRandomBtn.addEventListener('click', async () => {
+  if (!state.model) return;
+  const baseParams = new URLSearchParams({
+    model: state.model,
+    offset: 0, limit: 1,
+    show_errors: state.res_show_err ? '1' : '0',
+    show_parse_err: state.res_show_pe ? '1' : '0',
+  });
+  if (state.res_sid) baseParams.set('scenario_id', state.res_sid);
+  if (state.res_ev)  baseParams.set('evidence_variant', state.res_ev);
+  let total = 0;
+  try {
+    const r0 = await fetch('/api/results/rows?' + baseParams.toString());
+    if (r0.ok) total = (await r0.json()).total || 0;
+  } catch (_) { return; }
+  if (total <= 0) return;
+  const idx = Math.floor(Math.random() * total);
+  // Fetch that single row to capture its identifying tuple
+  const pickParams = new URLSearchParams(baseParams);
+  pickParams.set('offset', idx);
+  pickParams.set('limit', 1);
+  let pick = null;
+  try {
+    const r1 = await fetch('/api/results/rows?' + pickParams.toString());
+    if (r1.ok) {
+      const d1 = await r1.json();
+      pick = (d1.rows || [])[0] || null;
+    }
+  } catch (_) { return; }
+  if (!pick) return;
+  // Align list page to contain the picked row, pre-select it, refresh.
+  state.res_offset = Math.floor(idx / state.res_limit) * state.res_limit;
+  state.res_selected = {
+    scenario_id: pick.scenario_id,
+    evidence_variant: pick.evidence_variant,
+    permutation: pick.permutation,
+    raw_response_preview: pick.raw_response_preview,
+  };
+  await refreshResultsList();
+  await refreshResultsDetail();
+});
+
 // ─────────────────────────────────────────────────────────────
 // Prompts tab
 // ─────────────────────────────────────────────────────────────
@@ -2510,6 +2730,39 @@ document.getElementById('pmt-sid').addEventListener('input', e => {
 document.getElementById('pmt-ev').addEventListener('change', e => {
   state.pmt_ev = e.target.value;
   state.pmt_offset = 0; refreshPromptsList();
+});
+
+// Random-prompt jump button on the Prompts tab. Same strategy as
+// res-random-btn: query /api/prompts under the current filters to
+// learn `total`, pick a uniform index, page-align, pre-select, refresh.
+const _pmtRandomBtn = document.getElementById('pmt-random-btn');
+if (_pmtRandomBtn) _pmtRandomBtn.addEventListener('click', async () => {
+  const baseParams = new URLSearchParams({ offset: 0, limit: 1 });
+  if (state.pmt_sid) baseParams.set('scenario_id', state.pmt_sid);
+  if (state.pmt_ev)  baseParams.set('evidence_variant', state.pmt_ev);
+  let total = 0;
+  try {
+    const r0 = await fetch('/api/prompts?' + baseParams.toString());
+    if (r0.ok) total = (await r0.json()).total || 0;
+  } catch (_) { return; }
+  if (total <= 0) return;
+  const idx = Math.floor(Math.random() * total);
+  const pickParams = new URLSearchParams(baseParams);
+  pickParams.set('offset', idx);
+  pickParams.set('limit', 1);
+  let pick = null;
+  try {
+    const r1 = await fetch('/api/prompts?' + pickParams.toString());
+    if (r1.ok) {
+      const d1 = await r1.json();
+      pick = (d1.prompts || [])[0] || null;
+    }
+  } catch (_) { return; }
+  if (!pick) return;
+  state.pmt_offset = Math.floor(idx / state.pmt_limit) * state.pmt_limit;
+  state.pmt_selected = pick.name;
+  await refreshPromptsList();
+  await refreshPromptDetail();
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -3152,114 +3405,490 @@ async function drawSurface() {
   document.getElementById(id).addEventListener('change', drawSurface));
 
 // ─────────────────────────────────────────────────────────────
-// Frontier tab — per-model SR curves with threshold overlay
+// Frontier tab — baseline-vs-vigilance bars + side-by-side curves
 // ─────────────────────────────────────────────────────────────
+const FRONTIER_PALETTE = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+                          '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
+                          '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5',
+                          '#c49c94','#f7b6d2','#dbdb8d'];
+let frontierData = null;          // cached curve data from /api/frontier/data
+let frontierHidden = new Set();   // model slugs currently toggled off
+
 async function refreshFrontier() {
-  drawFrontier();
+  await loadFrontierData();
+  renderFrontierToggles();
+  drawFrontierCurves();
+  drawBaselineVsGap();
 }
-async function drawFrontier() {
-  const thresh = document.getElementById('frontier-thresh').value;
-  document.getElementById('frontier-thresh-val').textContent = thresh;
-  const r = await fetch(`/api/frontier/data?threshold=${thresh}`);
-  const d = await r.json();
-  const ns = 'http://www.w3.org/2000/svg';
-  const palette = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
-                   '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf'];
-  function drawCurves(svgId, key, xlabel, xLog) {
-    const svg = document.getElementById(svgId);
-    svg.innerHTML = '';
-    const W = 1000, H = (svgId === 'frontier-len-svg' ? 420 : 360);
-    const PAD = {l: 60, r: 220, t: 30, b: 50};
-    const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
-    // Axes
-    for (let y = 0; y <= 100; y += 20) {
-      const yp = PAD.t + innerH - innerH * y / 100;
-      const line = document.createElementNS(ns, 'line');
-      line.setAttribute('x1', PAD.l); line.setAttribute('x2', W - PAD.r);
-      line.setAttribute('y1', yp); line.setAttribute('y2', yp);
-      line.setAttribute('stroke', 'var(--rule)');
-      svg.appendChild(line);
-      const lbl = document.createElementNS(ns, 'text');
-      lbl.setAttribute('x', PAD.l - 6); lbl.setAttribute('y', yp + 4);
-      lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('font-size', '10');
-      lbl.setAttribute('fill', 'var(--muted)'); lbl.textContent = y;
-      svg.appendChild(lbl);
-    }
-    // Threshold line
-    const thY = PAD.t + innerH - innerH * thresh / 100;
-    const thL = document.createElementNS(ns, 'line');
-    thL.setAttribute('x1', PAD.l); thL.setAttribute('x2', W - PAD.r);
-    thL.setAttribute('y1', thY); thL.setAttribute('y2', thY);
-    thL.setAttribute('stroke', '#d0021b'); thL.setAttribute('stroke-width', '2');
-    thL.setAttribute('stroke-dasharray', '4,4');
-    svg.appendChild(thL);
-    const thLbl = document.createElementNS(ns, 'text');
-    thLbl.setAttribute('x', W - PAD.r + 4); thLbl.setAttribute('y', thY + 4);
-    thLbl.setAttribute('font-size', '11'); thLbl.setAttribute('fill', '#d0021b');
-    thLbl.textContent = `${thresh}% threshold`;
-    svg.appendChild(thLbl);
-    // Per-model curves
-    let xMin = Infinity, xMax = -Infinity;
-    d.models.forEach(m => {
-      m[key].forEach(p => {
-        if (p.sr == null) return;
-        xMin = Math.min(xMin, p.x); xMax = Math.max(xMax, p.x);
-      });
+
+async function loadFrontierData() {
+  const r = await fetch(`/api/frontier/data`);
+  frontierData = r.ok ? await r.json() : {models: []};
+}
+
+function modelColor(slug) {
+  if (!frontierData) return '#888';
+  const idx = frontierData.models.findIndex(m => m.model === slug);
+  return FRONTIER_PALETTE[idx % FRONTIER_PALETTE.length];
+}
+
+function renderFrontierToggles() {
+  const host = document.getElementById('frontier-model-toggles');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!frontierData || !frontierData.models.length) return;
+  for (const m of frontierData.models) {
+    const wrap = document.createElement('label');
+    wrap.style.cssText = 'display: inline-flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer; padding: 2px 6px; border-radius: 3px; background: #f8fafc; border: 1px solid #e2e8f0;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !frontierHidden.has(m.model);
+    cb.addEventListener('change', () => {
+      if (cb.checked) frontierHidden.delete(m.model);
+      else frontierHidden.add(m.model);
+      drawFrontierCurves();
     });
-    if (!isFinite(xMin)) return;
-    function xScale(v) {
-      if (xLog) {
-        const lmin = Math.log10(Math.max(1, xMin));
-        const lmax = Math.log10(Math.max(2, xMax));
-        return PAD.l + (Math.log10(Math.max(1, v)) - lmin) / (lmax - lmin) * innerW;
-      }
-      return PAD.l + (v - xMin) / (xMax - xMin) * innerW;
-    }
-    d.models.forEach((m, mi) => {
-      const color = palette[mi % palette.length];
-      const pts = m[key].filter(p => p.sr != null);
-      const path = pts.map((p, i) => {
-        const X = xScale(p.x); const Y = PAD.t + innerH - innerH * p.sr / 100;
-        return `${i === 0 ? 'M' : 'L'} ${X} ${Y}`;
-      }).join(' ');
-      const pathEl = document.createElementNS(ns, 'path');
-      pathEl.setAttribute('d', path); pathEl.setAttribute('stroke', color);
-      pathEl.setAttribute('stroke-width', '2'); pathEl.setAttribute('fill', 'none');
-      svg.appendChild(pathEl);
-      // dots
-      pts.forEach(p => {
-        const X = xScale(p.x); const Y = PAD.t + innerH - innerH * p.sr / 100;
-        const c = document.createElementNS(ns, 'circle');
-        c.setAttribute('cx', X); c.setAttribute('cy', Y); c.setAttribute('r', '3');
-        c.setAttribute('fill', color);
-        svg.appendChild(c);
-      });
-      // legend
-      const lx = W - PAD.r + 16, ly = PAD.t + 12 + mi * 18;
-      const sw = document.createElementNS(ns, 'rect');
-      sw.setAttribute('x', lx); sw.setAttribute('y', ly - 8);
-      sw.setAttribute('width', 12); sw.setAttribute('height', 10);
-      sw.setAttribute('fill', color); svg.appendChild(sw);
-      const lt = document.createElementNS(ns, 'text');
-      lt.setAttribute('x', lx + 16); lt.setAttribute('y', ly);
-      lt.setAttribute('font-size', '11'); lt.setAttribute('fill', 'var(--text)');
-      lt.textContent = m.model.replace('-preview','').replace('-20251001','') +
-        ` (${m.overall_sr}%)`;
-      svg.appendChild(lt);
-    });
-    // X axis label
-    const xL = document.createElementNS(ns, 'text');
-    xL.setAttribute('x', PAD.l + innerW / 2); xL.setAttribute('y', H - 10);
-    xL.setAttribute('text-anchor', 'middle'); xL.setAttribute('font-size', '12');
-    xL.setAttribute('fill', 'var(--text)'); xL.textContent = xlabel;
-    svg.appendChild(xL);
+    wrap.appendChild(cb);
+    const swatch = document.createElement('span');
+    swatch.style.cssText = `display:inline-block; width:10px; height:10px; background:${modelColor(m.model)}; border-radius: 2px;`;
+    wrap.appendChild(swatch);
+    const label = document.createElement('span');
+    let name = m.model.replace('-preview','').replace('-20251001','').replace('qwen_qwen','qwen');
+    if (name.length > 28) name = name.slice(0, 26) + '…';
+    label.textContent = `${name} (${m.overall_sr ?? '–'}%)`;
+    wrap.appendChild(label);
+    host.appendChild(wrap);
   }
-  drawCurves('frontier-len-svg', 'length_curve', 'char_budget (log scale)', true);
-  drawCurves('frontier-dep-svg', 'depth_curve', 'placement_frac (depth)', false);
-  document.getElementById('frontier-meta').textContent =
-    `${d.models.length} models on canon_unified. Lines below the dashed line are below threshold.`;
 }
-document.getElementById('frontier-thresh').addEventListener('input', drawFrontier);
+
+function drawFrontierCurves() {
+  if (!frontierData) return;
+  // Length-axis scale is user-toggleable. Default = log (the historical
+  // shape; canon_unified char_budget is sampled log-uniform on
+  // [3K, 250K], so log spreads the points evenly. Linear is useful for
+  // checking whether the curve really is shallow at the high end vs.
+  // a log-induced visual stretch.)
+  const lenScaleEl = document.querySelector('input[name="frontier-len-scale"]:checked');
+  const lenLog = !lenScaleEl || lenScaleEl.value === 'log';
+  const lenXLabel = lenLog ? 'char_budget (log scale)' : 'char_budget (linear scale)';
+  const titleEl = document.getElementById('frontier-len-title');
+  if (titleEl) titleEl.textContent = 'SR vs char_budget (' + (lenLog ? 'log' : 'linear') + ' scale)';
+  drawCurve('frontier-len-svg', 'length_curve', lenXLabel, lenLog);
+  drawCurve('frontier-dep-svg', 'depth_curve', 'placement_frac (depth)', false);
+  const visible = frontierData.models.filter(m => !frontierHidden.has(m.model));
+  document.getElementById('frontier-meta').textContent =
+    `${visible.length} of ${frontierData.models.length} models visible · canon_unified, C-bearing variants only.`;
+}
+
+function drawCurve(svgId, key, xlabel, xLog) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  svg.innerHTML = '';
+  const W = 720, H = 380;
+  const PAD = {l: 50, r: 16, t: 16, b: 44};
+  const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
+  // Y-axis grid + labels (0–100%)
+  for (let y = 0; y <= 100; y += 20) {
+    const yp = PAD.t + innerH - innerH * y / 100;
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', PAD.l); line.setAttribute('x2', W - PAD.r);
+    line.setAttribute('y1', yp); line.setAttribute('y2', yp);
+    line.setAttribute('stroke', '#e2e8f0');
+    svg.appendChild(line);
+    const lbl = document.createElementNS(ns, 'text');
+    lbl.setAttribute('x', PAD.l - 6); lbl.setAttribute('y', yp + 4);
+    lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('font-size', '10');
+    lbl.setAttribute('fill', '#64748b'); lbl.textContent = y + '%';
+    svg.appendChild(lbl);
+  }
+  // X range from all rows (so axis is stable when models are toggled)
+  let xMin = Infinity, xMax = -Infinity;
+  frontierData.models.forEach(m => {
+    m[key].forEach(p => {
+      if (p.sr == null) return;
+      xMin = Math.min(xMin, p.x); xMax = Math.max(xMax, p.x);
+    });
+  });
+  if (!isFinite(xMin)) return;
+  function xScale(v) {
+    if (xLog) {
+      const lmin = Math.log10(Math.max(1, xMin));
+      const lmax = Math.log10(Math.max(2, xMax));
+      return PAD.l + (Math.log10(Math.max(1, v)) - lmin) / (lmax - lmin) * innerW;
+    }
+    return PAD.l + (v - xMin) / (xMax - xMin) * innerW;
+  }
+  // Per-model curves (only visible ones)
+  frontierData.models.forEach(m => {
+    if (frontierHidden.has(m.model)) return;
+    const color = modelColor(m.model);
+    const pts = m[key].filter(p => p.sr != null);
+    const path = pts.map((p, i) => {
+      const X = xScale(p.x); const Y = PAD.t + innerH - innerH * p.sr / 100;
+      return `${i === 0 ? 'M' : 'L'} ${X} ${Y}`;
+    }).join(' ');
+    const pathEl = document.createElementNS(ns, 'path');
+    pathEl.setAttribute('d', path); pathEl.setAttribute('stroke', color);
+    pathEl.setAttribute('stroke-width', '1.8'); pathEl.setAttribute('fill', 'none');
+    pathEl.setAttribute('opacity', '0.85');
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = m.model;
+    pathEl.appendChild(title);
+    svg.appendChild(pathEl);
+    pts.forEach(p => {
+      const X = xScale(p.x); const Y = PAD.t + innerH - innerH * p.sr / 100;
+      const c = document.createElementNS(ns, 'circle');
+      c.setAttribute('cx', X); c.setAttribute('cy', Y); c.setAttribute('r', '2.5');
+      c.setAttribute('fill', color);
+      svg.appendChild(c);
+    });
+  });
+  // X axis label
+  const xL = document.createElementNS(ns, 'text');
+  xL.setAttribute('x', PAD.l + innerW / 2); xL.setAttribute('y', H - 10);
+  xL.setAttribute('text-anchor', 'middle'); xL.setAttribute('font-size', '11');
+  xL.setAttribute('fill', '#475569'); xL.textContent = xlabel;
+  svg.appendChild(xL);
+}
+
+// Show/Hide all buttons
+document.getElementById('frontier-show-all').addEventListener('click', () => {
+  frontierHidden.clear();
+  renderFrontierToggles();
+  drawFrontierCurves();
+});
+document.getElementById('frontier-hide-all').addEventListener('click', () => {
+  if (!frontierData) return;
+  frontierData.models.forEach(m => frontierHidden.add(m.model));
+  renderFrontierToggles();
+  drawFrontierCurves();
+});
+
+// Length-axis scale toggle (log ↔ linear). Only redraws — no fetch.
+document.querySelectorAll('input[name="frontier-len-scale"]').forEach(el => {
+  el.addEventListener('change', () => drawFrontierCurves());
+});
+
+// ─────────────────────────────────────────────────────────────
+// Baseline-vs-gap chart (grouped bars + stars per metric)
+// ─────────────────────────────────────────────────────────────
+async function drawBaselineVsGap() {
+  const r = await fetch('/api/frontier/baseline_vs_unified');
+  if (!r.ok) {
+    document.getElementById('frontier-bvg-meta').textContent =
+      'Error ' + r.status;
+    return;
+  }
+  const d = await r.json();
+  const svg = document.getElementById('frontier-bvg-svg');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  // Read selected metrics from the checkboxes
+  const METRICS = ['SR', 'CM', 'MUE'].filter(m =>
+    document.getElementById('bvg-met-' + m).checked);
+  if (METRICS.length === 0) {
+    document.getElementById('frontier-bvg-meta').textContent =
+      'No metric selected — pick at least one of SR / CM / MUE.';
+    return;
+  }
+
+  // Layout: extra room at the bottom for rotated labels + bottom legend.
+  // PAD_B grows as more metrics are shown (more bars per slot = labels
+  // hang further past the centerline) and label rotation needs space.
+  const W = 1400, H = 620;
+  const PAD_L = 56, PAD_R = 16, PAD_T = 36, PAD_B = 200;
+  const PLOT_W = W - PAD_L - PAD_R, PLOT_H = H - PAD_T - PAD_B;
+
+  const METRIC_COLORS = {
+    SR:  '#3b82f6',
+    CM:  '#a855f7',
+    MUE: '#10b981',
+  };
+
+  // Apply sort
+  const sortMode = document.getElementById('bvg-sort').value;
+  const models = [...d.models];
+  const groupByStage = (sortMode === 'stage');
+  if (sortMode === 'stage') {
+    // already comes back stage-grouped & SR-desc-within-stage from the API
+  } else if (sortMode === 'unified_SR_desc') {
+    models.sort((a,b) => (b.unified.SR ?? -1) - (a.unified.SR ?? -1));
+  } else if (sortMode === 'unified_SR_asc') {
+    models.sort((a,b) => (a.unified.SR ?? 999) - (b.unified.SR ?? 999));
+  } else if (sortMode === 'nodist_SR_desc') {
+    models.sort((a,b) => (b.no_dist.SR ?? -1) - (a.no_dist.SR ?? -1));
+  } else if (sortMode === 'gap_SR_desc') {
+    const gap = m => (m.no_dist.SR != null && m.unified.SR != null)
+      ? (m.no_dist.SR - m.unified.SR) : -999;
+    models.sort((a,b) => gap(b) - gap(a));
+  } else if (sortMode === 'unified_CM_desc') {
+    models.sort((a,b) => (b.unified.CM ?? -1) - (a.unified.CM ?? -1));
+  } else if (sortMode === 'unified_MUE_desc') {
+    models.sort((a,b) => (b.unified.MUE ?? -1) - (a.unified.MUE ?? -1));
+  } else if (sortMode === 'name_asc') {
+    models.sort((a,b) => (a.model_display || a.model).localeCompare(b.model_display || b.model));
+  }
+
+  // Group models — stages array used only when groupByStage is true,
+  // otherwise treat as one big group with no dividers/headers.
+  const stages = [];
+  if (groupByStage) {
+    let curStage = null;
+    for (const m of models) {
+      if (!curStage || curStage.label !== m.stage_label) {
+        curStage = {label: m.stage_label, order: m.stage_order, models: []};
+        stages.push(curStage);
+      }
+      curStage.models.push(m);
+    }
+  } else {
+    stages.push({label: '', order: 0, models: models});
+  }
+
+  // Compute layout: each model gets a "model-slot" of width slot_w with
+  // 3 bars side-by-side. Stages separated by extra gap.
+  const TOTAL_MODELS = d.models.length;
+  if (TOTAL_MODELS === 0) {
+    document.getElementById('frontier-bvg-meta').textContent =
+      'No models with canon_unified data';
+    return;
+  }
+  const STAGE_GAP = groupByStage ? 24 : 0;
+  const dividerCount = Math.max(0, stages.length - 1);
+  const total_slot_space = PLOT_W - dividerCount * STAGE_GAP;
+  const slot_w = total_slot_space / TOTAL_MODELS;
+  // Make bars wider when only 1 metric is selected — better look
+  const bars_per_slot = METRICS.length;
+  const bar_w = (slot_w * 0.88) / bars_per_slot;
+  const slot_pad = slot_w * 0.06;
+
+  // Y axis: 0..100
+  const yScale = (v) => PAD_T + PLOT_H * (1 - v / 100);
+
+  // ─ Y-axis grid + labels
+  for (let v = 0; v <= 100; v += 10) {
+    const y = yScale(v);
+    const line = document.createElementNS(NS, 'line');
+    line.setAttribute('x1', PAD_L);
+    line.setAttribute('x2', W - PAD_R);
+    line.setAttribute('y1', y);
+    line.setAttribute('y2', y);
+    line.setAttribute('stroke', v % 25 === 0 ? '#cbd5e1' : '#e2e8f0');
+    line.setAttribute('stroke-dasharray', v === 0 || v === 100 ? '' : '2,2');
+    svg.appendChild(line);
+    const label = document.createElementNS(NS, 'text');
+    label.setAttribute('x', PAD_L - 6);
+    label.setAttribute('y', y + 4);
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('font-size', '11');
+    label.setAttribute('fill', '#64748b');
+    label.textContent = v + '%';
+    svg.appendChild(label);
+  }
+
+  // ─ Title row + stage headers + bars
+  let xCursor = PAD_L;
+  for (const stage of stages) {
+    if (groupByStage) {
+      // Stage label centered above its model group
+      const stageStart = xCursor;
+      const stageW = stage.models.length * slot_w;
+      const stageLabel = document.createElementNS(NS, 'text');
+      stageLabel.setAttribute('x', stageStart + stageW / 2);
+      stageLabel.setAttribute('y', PAD_T - 12);
+      stageLabel.setAttribute('text-anchor', 'middle');
+      stageLabel.setAttribute('font-size', '11');
+      stageLabel.setAttribute('font-weight', '600');
+      stageLabel.setAttribute('fill', '#475569');
+      stageLabel.textContent = stage.label;
+      svg.appendChild(stageLabel);
+
+      // Stage divider line between this and the previous stage
+      if (xCursor > PAD_L) {
+        const div = document.createElementNS(NS, 'line');
+        div.setAttribute('x1', xCursor - STAGE_GAP / 2);
+        div.setAttribute('x2', xCursor - STAGE_GAP / 2);
+        div.setAttribute('y1', PAD_T);
+        div.setAttribute('y2', PAD_T + PLOT_H);
+        div.setAttribute('stroke', '#94a3b8');
+        div.setAttribute('stroke-dasharray', '4,3');
+        svg.appendChild(div);
+      }
+    }
+
+    for (const m of stage.models) {
+      const slotX = xCursor;
+
+      // 3 bars per model
+      for (let i = 0; i < METRICS.length; i++) {
+        const metric = METRICS[i];
+        const barX = slotX + slot_pad + i * bar_w;
+        const v_unified = m.unified[metric];
+        const v_nodist  = m.no_dist[metric];
+
+        if (v_unified != null) {
+          const yTop = yScale(v_unified);
+          const rect = document.createElementNS(NS, 'rect');
+          rect.setAttribute('x', barX);
+          rect.setAttribute('y', yTop);
+          rect.setAttribute('width', bar_w * 0.92);
+          rect.setAttribute('height', PAD_T + PLOT_H - yTop);
+          rect.setAttribute('fill', METRIC_COLORS[metric]);
+          rect.setAttribute('opacity', '0.78');
+          // tooltip via title element
+          const title = document.createElementNS(NS, 'title');
+          title.textContent =
+            `${m.model_display}\nunified ${metric}: ${v_unified.toFixed(1)}%` +
+            (v_nodist != null ? `\nno-dist ${metric}: ${v_nodist.toFixed(1)}%` : '');
+          rect.appendChild(title);
+          svg.appendChild(rect);
+
+          // value label above bar (if there's room)
+          if (v_unified > 8) {
+            const lbl = document.createElementNS(NS, 'text');
+            lbl.setAttribute('x', barX + bar_w * 0.46);
+            lbl.setAttribute('y', yTop - 2);
+            lbl.setAttribute('text-anchor', 'middle');
+            lbl.setAttribute('font-size', '8');
+            lbl.setAttribute('fill', '#475569');
+            lbl.textContent = v_unified.toFixed(0);
+            svg.appendChild(lbl);
+          }
+        }
+
+        // Star for no-dist (5-pointed star path)
+        if (v_nodist != null) {
+          const cx = barX + bar_w * 0.46;
+          const cy = yScale(v_nodist);
+          const r1 = 5, r2 = 2.2;
+          let path = '';
+          for (let k = 0; k < 10; k++) {
+            const angle = (Math.PI * 2 * k / 10) - Math.PI / 2;
+            const radius = (k % 2 === 0) ? r1 : r2;
+            const x = cx + Math.cos(angle) * radius;
+            const y = cy + Math.sin(angle) * radius;
+            path += (k === 0 ? 'M ' : 'L ') + x + ',' + y + ' ';
+          }
+          path += 'Z';
+          const star = document.createElementNS(NS, 'path');
+          star.setAttribute('d', path);
+          star.setAttribute('fill', METRIC_COLORS[metric]);
+          star.setAttribute('stroke', '#1e293b');
+          star.setAttribute('stroke-width', '0.7');
+          const stitle = document.createElementNS(NS, 'title');
+          stitle.textContent =
+            `${m.model_display}\nno-dist ${metric}: ${v_nodist.toFixed(1)}%`;
+          star.appendChild(stitle);
+          svg.appendChild(star);
+        }
+      }
+
+      // Model label (rotated -60° below the bars; -60° instead of -45°
+      // takes less horizontal room per label which helps with the long
+      // qwen3.5-NNN-reasoning-off names)
+      const tx = slotX + slot_w / 2;
+      const ty = PAD_T + PLOT_H + 8;
+      const txt = document.createElementNS(NS, 'text');
+      txt.setAttribute('x', tx);
+      txt.setAttribute('y', ty);
+      txt.setAttribute('text-anchor', 'end');
+      txt.setAttribute('transform', `rotate(-60, ${tx}, ${ty})`);
+      txt.setAttribute('font-size', '10');
+      txt.setAttribute('fill', '#334155');
+      let name = m.model_display || m.model;
+      // Strip the redundant "qwen_" / "openai_" prefix, leave reasoning suffix
+      name = name.replace(/^qwen_qwen/, 'qwen').replace(/^openai_/, '').replace(/^deepseek_/, '');
+      if (name.length > 30) name = name.slice(0, 28) + '…';
+      txt.textContent = name;
+      // Tooltip shows full name
+      const ntitle = document.createElementNS(NS, 'title');
+      ntitle.textContent = m.model_display || m.model;
+      txt.appendChild(ntitle);
+      svg.appendChild(txt);
+
+      xCursor += slot_w;
+    }
+
+    xCursor += STAGE_GAP;
+  }
+
+  // ─ Y-axis title
+  const yTitle = document.createElementNS(NS, 'text');
+  yTitle.setAttribute('x', 14);
+  yTitle.setAttribute('y', PAD_T + PLOT_H / 2);
+  yTitle.setAttribute('text-anchor', 'middle');
+  yTitle.setAttribute('font-size', '12');
+  yTitle.setAttribute('font-weight', '600');
+  yTitle.setAttribute('fill', '#334155');
+  yTitle.setAttribute('transform', `rotate(-90, 14, ${PAD_T + PLOT_H / 2})`);
+  yTitle.textContent = 'Metric (%)';
+  svg.appendChild(yTitle);
+
+  // ─ Legend (top-right corner inside chart area — clear of rotated x-labels)
+  const legY = 16;
+  // Right-align legend; estimate width from selected metrics
+  const legItemW = 92;
+  const legW = METRICS.length * legItemW + 220;  // metrics + star item
+  let lx = W - PAD_R - legW;
+  for (const metric of METRICS) {
+    const sw = document.createElementNS(NS, 'rect');
+    sw.setAttribute('x', lx);
+    sw.setAttribute('y', legY - 8);
+    sw.setAttribute('width', 12);
+    sw.setAttribute('height', 8);
+    sw.setAttribute('fill', METRIC_COLORS[metric]);
+    sw.setAttribute('opacity', '0.78');
+    svg.appendChild(sw);
+    const lbl = document.createElementNS(NS, 'text');
+    lbl.setAttribute('x', lx + 16);
+    lbl.setAttribute('y', legY);
+    lbl.setAttribute('font-size', '11');
+    lbl.setAttribute('fill', '#334155');
+    lbl.textContent = metric + ' (unified)';
+    svg.appendChild(lbl);
+    lx += legItemW;
+  }
+  // Star legend item — same row, to the right of the bar swatches
+  const r1 = 5, r2 = 2.2;
+  const cx = lx + 6, cy = legY - 4;
+  let path = '';
+  for (let k = 0; k < 10; k++) {
+    const angle = (Math.PI * 2 * k / 10) - Math.PI / 2;
+    const radius = (k % 2 === 0) ? r1 : r2;
+    const x = cx + Math.cos(angle) * radius;
+    const y = cy + Math.sin(angle) * radius;
+    path += (k === 0 ? 'M ' : 'L ') + x + ',' + y + ' ';
+  }
+  path += 'Z';
+  const star = document.createElementNS(NS, 'path');
+  star.setAttribute('d', path);
+  star.setAttribute('fill', '#64748b');
+  star.setAttribute('stroke', '#1e293b');
+  star.setAttribute('stroke-width', '0.7');
+  svg.appendChild(star);
+  const slbl = document.createElementNS(NS, 'text');
+  slbl.setAttribute('x', lx + 16);
+  slbl.setAttribute('y', legY);
+  slbl.setAttribute('font-size', '11');
+  slbl.setAttribute('fill', '#334155');
+  slbl.textContent = '★ = canon_no_distractor';
+  svg.appendChild(slbl);
+
+  const sortLabel = document.getElementById('bvg-sort').selectedOptions[0].textContent;
+  document.getElementById('frontier-bvg-meta').textContent =
+    `${d.models.length} models · sorted by ${sortLabel} · ` +
+    `metrics: ${METRICS.join(', ')} · ` +
+    `bars = canon_unified, ★ = canon_no_distractor.`;
+}
+
+// Wire the metric checkboxes + sort dropdown to redraw on change
+['SR', 'CM', 'MUE'].forEach(m => {
+  const el = document.getElementById('bvg-met-' + m);
+  if (el) el.addEventListener('change', drawBaselineVsGap);
+});
+const bvgSortEl = document.getElementById('bvg-sort');
+if (bvgSortEl) bvgSortEl.addEventListener('change', drawBaselineVsGap);
 
 </script>
 

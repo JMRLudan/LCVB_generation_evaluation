@@ -124,7 +124,7 @@ GEMINI_TO_OR_PRICING_DEFAULT: dict[str, str] = {
     "gemini-3-flash-preview":        "google/gemini-3-flash-preview",
     "gemini-3.1-pro-preview":        "google/gemini-3.1-pro-preview",
     "gemini-3.1-flash-lite-preview": "google/gemini-3.1-flash-lite-preview",
-    # Older 2.5 family (used in SVB-era runs)
+    # Older 2.5 family — kept for back-compat with archived runs
     "gemini-2.5-pro":                "google/gemini-2.5-pro",
     "gemini-2.5-flash":              "google/gemini-2.5-flash",
 }

@@ -150,8 +150,15 @@ def build_judge_requests(
     row_lookup: dict[str, dict] = {}
     skipped_subject_err = 0
     skipped_unknown_perm = 0
+    # Anthropic Batches require unique custom_ids within a batch.
+    # When the same (sid, variant, perm) appears multiple times in the
+    # TSV (e.g. canon_unified resamples written by run.py without the
+    # -d{n}-l{n} suffix), append a row index disambiguator. The lookup
+    # map still keys by the same full custom_id so fetch patches the
+    # correct row.
+    cid_seen_count: dict[str, int] = {}
 
-    for r in rows:
+    for row_idx, r in enumerate(rows):
         if (r.get("raw_response") or "").startswith("ERROR"):
             skipped_subject_err += 1
             continue
@@ -176,7 +183,10 @@ def build_judge_requests(
         user_msg = build_judge_user_message(scen, variant, seed_indices, raw)
         # Custom id: append `J` so it doesn't collide with subject ids in the cost log
         # — and remains unique within the judge batch.
-        cid = make_custom_id(f"{run_id}J", sid, variant, perm_full)
+        base_cid = make_custom_id(f"{run_id}J", sid, variant, perm_full)
+        n_seen = cid_seen_count.get(base_cid, 0)
+        cid_seen_count[base_cid] = n_seen + 1
+        cid = base_cid if n_seen == 0 else f"{base_cid}__r{row_idx}"
         row_lookup[cid] = r
         requests.append(BatchRequest(
             custom_id=cid,
