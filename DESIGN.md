@@ -58,10 +58,10 @@ three fixed-length presets (short/medium/long). The unified design
 sweeps both length and depth jointly per row. Two reasons drove the
 change:
 
-1. **Length is a continuous variable.** Treating it as three
+1. **Length is a continuous variable.** Treating it as three discrete
    levels obscures the shape of the degradation curve. With per-row
-   log-uniform length sampling and per-row uniform depth, the headline
-   plot becomes a 2D surface `SR(length, depth)` rather than three
+   log-uniform length sampling and per-row uniform depth, the SR
+   surface can be plotted as `SR(length, depth)` rather than three
    superimposed depth curves at fixed lengths.
 2. **Per-prompt economics.** The geometric mean of
    log-uniform([3 000, 250 000]) is ≈ 27 000 chars, vs the weighted
@@ -72,11 +72,11 @@ change:
 
 A `canon_fixed_grid` condition (5 fixed depths × 3 haystacks) was part
 of an earlier iteration of the canon and remains callable through
-`render_fixed_locations.py` if needed for ablations, but is no longer
-part of the headline canon. The previous three-tier
+`render_fixed_locations.py` if needed for ablations, but is not part of
+the current canon. The previous three-tier
 `canon_uniform_short/medium/long` presets are similarly retired —
-representable via `length_mode="fixed"` with the historical `lengths_named`
-values if back-compat replication is needed.
+representable via `length_mode="fixed"` with the historical
+`lengths_named` values if back-compat replication is needed.
 
 Any new condition — ablations, rebuttal experiments, robustness checks —
 is defined the same way: specify the point in the hypercube, call

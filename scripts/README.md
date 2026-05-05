@@ -1,7 +1,7 @@
 # LCVB scripts — reproduction recipe
 
-Four canonical scripts cover everything needed to run, monitor,
-summarize, and publish LCVB canon evaluations.
+The `scripts/` directory holds four utilities for running, monitoring,
+summarizing, and publishing LCVB canon evaluations.
 
 ```
 scripts/
@@ -109,8 +109,9 @@ python3 scripts/per_model_card.py --model qwen/qwen3.5-9b
 python3 scripts/per_model_card.py --all
 ```
 
-The viewer is the canonical analysis surface. Frontier tab → "Baseline
-vs vigilance" chart shows all models in the roster grouped by stage.
+The viewer renders all per-model and per-preset metrics. The Frontier
+tab's "Baseline vs vigilance" chart shows all models in the roster
+grouped by stage.
 
 ## Flags reference (`run_canon.sh`)
 
@@ -122,12 +123,13 @@ vs vigilance" chart shows all models in the roster grouped by stage.
 | `--concurrency` | 100 | Per-preset OR concurrency. Drop to 30–50 if you hit account-tier rate limits frequently. |
 | `--max-tokens` | 30000 | Per-call output cap. Reasoning models with thinking on can want 10K+ tokens; 30K leaves headroom. |
 
-## What this NOT covers
+## What this does not cover
 
-- **Building the canon prompt set itself** — see `pipeline/renderers/`
-  and `DESIGN.md`. The repo ships pre-rendered prompts in `generated/`;
-  re-render only if you change the scenarios or distractor pool.
-- **The original batch-API runs (Stages 2–5)** — those used
-  `pipeline/batch_runner.py` directly to leverage Anthropic/OpenAI/Gemini
-  Batch APIs at 50% off. The real-time path here produces identical
-  output rows. See `pipeline/batch_runner.py --help` for batch usage.
+- Building the canon prompt set. See `pipeline/renderers/` and
+  `DESIGN.md`. The repo ships pre-rendered prompts in `generated/`;
+  re-render only if you change the scenarios or the distractor pool.
+- Batch-API submission. The original Stages 2–5 used
+  `pipeline/batch_runner.py` directly against the Anthropic, OpenAI,
+  and Gemini Batch APIs (50% pricing). The real-time path documented
+  here produces output rows with the same schema. See
+  `pipeline/batch_runner.py --help` for batch usage.

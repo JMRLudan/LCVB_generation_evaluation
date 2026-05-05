@@ -154,8 +154,10 @@ tar -xzvf /path/to/lcvb-data-${VERSION}.tar.gz   # extracts in-place
 python3 viewer/app.py
 \`\`\`
 
-The viewer's Frontier tab → "Baseline vs vigilance" chart is the paper's
-headline figure.
+The viewer's Frontier tab includes a "Baseline vs vigilance" chart
+that places every model in the roster on a single grouped-bar
+display, alongside per-preset overall and per-variant metrics in the
+Charts and Scenarios tabs.
 
 ## Provenance
 

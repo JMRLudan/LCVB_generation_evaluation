@@ -6,8 +6,10 @@ model's responses on the LCVB canon, plus the complete judge contract.
 To reproduce any model's results: (1) take the prompts in
 `generated/canon_<preset>/<key>.json`, (2) call the model below with
 the listed settings, (3) judge with the Haiku settings at the bottom.
-**No further implementation detail (batch vs real-time, retry policy,
-runner code) affects the model's output distribution.**
+Implementation choices that should not affect the output distribution
+— batch vs real-time submission, retry policy, runner code — are not
+documented here; the model and the API parameters in the table below
+are what determines a row's content.
 
 The `model_params_json` column in `pipeline/api_logs/raw_io.csv`
 captures what was actually sent on every call; the table below
