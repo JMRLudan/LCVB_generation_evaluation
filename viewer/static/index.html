@@ -988,9 +988,17 @@
         <label><input type="checkbox" id="bvg-met-CM"          /> CM</label>
         <label><input type="checkbox" id="bvg-met-MUE"         /> MUE</label>
       </span>
+      <span title="Restricts SR / CM / MUE calculation to the selected variant subset. Affects both the bar chart above and the SR-vs-length / SR-vs-depth curves below.">
+        <label style="margin-right:6px;">Variants:</label>
+        <label><input type="checkbox" class="frontier-var" value="C"   checked /> C</label>
+        <label><input type="checkbox" class="frontier-var" value="A+C" checked /> A+C</label>
+        <label><input type="checkbox" class="frontier-var" value="B+C" checked /> B+C</label>
+        <label><input type="checkbox" class="frontier-var" value="A"   /> A</label>
+        <label><input type="checkbox" class="frontier-var" value="B"   /> B</label>
+      </span>
       <span><label style="margin-right:6px;">Sort by:</label>
         <select id="bvg-sort">
-          <option value="stage">Stage (grouped)</option>
+          <option value="stage">Vendor / family (grouped)</option>
           <option value="unified_SR_desc">Unified SR ↓</option>
           <option value="unified_SR_asc">Unified SR ↑</option>
           <option value="nodist_SR_desc">No-dist SR ↓</option>
@@ -1005,10 +1013,11 @@
     <p class="small-meta" id="frontier-bvg-meta"></p>
   </div>
   <div class="panel full" style="margin-top: 18px;">
-    <h2>SR vs prompt length / SR vs depth — canon_unified, C-bearing variants</h2>
+    <h2>SR vs prompt length / SR vs depth — canon_unified</h2>
     <p class="panel-sub">
       One line per model. Click a model name to toggle its visibility on
-      both charts. Y-axis pinned 0–100%.
+      both charts. Y-axis pinned 0–100%. The variant filter above
+      applies to both curves.
     </p>
     <div class="toolbar" style="margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
       <button id="frontier-show-all" class="small-btn">Show all</button>
@@ -3414,6 +3423,43 @@ const FRONTIER_PALETTE = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
 let frontierData = null;          // cached curve data from /api/frontier/data
 let frontierHidden = new Set();   // model slugs currently toggled off
 
+// Read the frontier-tab variant filter as a comma-joined query-string
+// fragment. Returns "" if the (defensive) selection is empty so the
+// server applies its own default of C-bearing.
+function frontierVariantsQS() {
+  const v = [];
+  document.querySelectorAll('.frontier-var:checked').forEach(cb => v.push(cb.value));
+  return v.length ? 'variants=' + encodeURIComponent(v.join(',')) : '';
+}
+
+// Render a centered placeholder message inside an SVG when there's
+// nothing to chart. Used when a variant selection produces an empty
+// dataset so the user gets feedback rather than a blank rectangle.
+function _drawEmptyChart(svg, message) {
+  const ns = 'http://www.w3.org/2000/svg';
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  // SVG viewBox dimensions vary across charts; pull width/height from
+  // the viewBox attribute so we can center the text correctly.
+  const vb = (svg.getAttribute('viewBox') || '0 0 720 380').split(/\s+/);
+  const W = parseFloat(vb[2]) || 720, H = parseFloat(vb[3]) || 380;
+  const t = document.createElementNS(ns, 'text');
+  t.setAttribute('x', W / 2); t.setAttribute('y', H / 2);
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('dominant-baseline', 'middle');
+  t.setAttribute('font-size', '14');
+  t.setAttribute('fill', 'var(--muted)');
+  t.textContent = message;
+  svg.appendChild(t);
+  const sub = document.createElementNS(ns, 'text');
+  sub.setAttribute('x', W / 2); sub.setAttribute('y', H / 2 + 22);
+  sub.setAttribute('text-anchor', 'middle');
+  sub.setAttribute('dominant-baseline', 'middle');
+  sub.setAttribute('font-size', '11');
+  sub.setAttribute('fill', 'var(--muted)');
+  sub.textContent = 'Try widening the variant selection above.';
+  svg.appendChild(sub);
+}
+
 async function refreshFrontier() {
   await loadFrontierData();
   renderFrontierToggles();
@@ -3422,7 +3468,8 @@ async function refreshFrontier() {
 }
 
 async function loadFrontierData() {
-  const r = await fetch(`/api/frontier/data`);
+  const qs = frontierVariantsQS();
+  const r = await fetch(`/api/frontier/data` + (qs ? '?' + qs : ''));
   frontierData = r.ok ? await r.json() : {models: []};
 }
 
@@ -3473,11 +3520,36 @@ function drawFrontierCurves() {
   const lenXLabel = lenLog ? 'char_budget (log scale)' : 'char_budget (linear scale)';
   const titleEl = document.getElementById('frontier-len-title');
   if (titleEl) titleEl.textContent = 'SR vs char_budget (' + (lenLog ? 'log' : 'linear') + ' scale)';
+
+  const variantsLabel = (frontierData.variants && frontierData.variants.length)
+    ? frontierData.variants.join(' / ')
+    : 'none';
+  const meta = document.getElementById('frontier-meta');
+
+  // Empty-data safeguard: if no model has any usable curve points
+  // under the current variant filter, render an explanatory placeholder
+  // in both SVGs and stop here. (`frontier_data` only emits a model
+  // entry when it has at least one row matching the filter, so an
+  // empty `models` array is the canonical signal.)
+  if (!frontierData.models || frontierData.models.length === 0) {
+    const lenSvg = document.getElementById('frontier-len-svg');
+    const depSvg = document.getElementById('frontier-dep-svg');
+    if (lenSvg) _drawEmptyChart(lenSvg,
+      `No SR-curve data for variants: ${variantsLabel}`);
+    if (depSvg) _drawEmptyChart(depSvg,
+      `No SR-curve data for variants: ${variantsLabel}`);
+    if (meta) meta.textContent =
+      `0 models have rows for variants: ${variantsLabel}. ` +
+      `(Note: SR is only defined for C-bearing variants — selecting only A or B will always be empty.)`;
+    return;
+  }
+
   drawCurve('frontier-len-svg', 'length_curve', lenXLabel, lenLog);
   drawCurve('frontier-dep-svg', 'depth_curve', 'placement_frac (depth)', false);
   const visible = frontierData.models.filter(m => !frontierHidden.has(m.model));
-  document.getElementById('frontier-meta').textContent =
-    `${visible.length} of ${frontierData.models.length} models visible · canon_unified, C-bearing variants only.`;
+  if (meta) meta.textContent =
+    `${visible.length} of ${frontierData.models.length} models visible · ` +
+    `canon_unified, variants: ${variantsLabel}.`;
 }
 
 function drawCurve(svgId, key, xlabel, xLog) {
@@ -3510,7 +3582,14 @@ function drawCurve(svgId, key, xlabel, xLog) {
       xMin = Math.min(xMin, p.x); xMax = Math.max(xMax, p.x);
     });
   });
-  if (!isFinite(xMin)) return;
+  // Safeguard: every model entry exists but every point has null SR
+  // (rare — shouldn't happen because the server only returns model
+  // entries with at least one row, but possible in edge cases like a
+  // run where every row has parse_error=1).
+  if (!isFinite(xMin)) {
+    _drawEmptyChart(svg, 'No usable SR points to plot');
+    return;
+  }
   function xScale(v) {
     if (xLog) {
       const lmin = Math.log10(Math.max(1, xMin));
@@ -3574,7 +3653,8 @@ document.querySelectorAll('input[name="frontier-len-scale"]').forEach(el => {
 // Baseline-vs-gap chart (grouped bars + stars per metric)
 // ─────────────────────────────────────────────────────────────
 async function drawBaselineVsGap() {
-  const r = await fetch('/api/frontier/baseline_vs_unified');
+  const qs = frontierVariantsQS();
+  const r = await fetch('/api/frontier/baseline_vs_unified' + (qs ? '?' + qs : ''));
   if (!r.ok) {
     document.getElementById('frontier-bvg-meta').textContent =
       'Error ' + r.status;
@@ -3584,12 +3664,33 @@ async function drawBaselineVsGap() {
   const svg = document.getElementById('frontier-bvg-svg');
   while (svg.firstChild) svg.removeChild(svg.firstChild);
 
+  const variantsLabel = (d.variants && d.variants.length)
+    ? d.variants.join(' / ')
+    : 'none';
+
   // Read selected metrics from the checkboxes
   const METRICS = ['SR', 'CM', 'MUE'].filter(m =>
     document.getElementById('bvg-met-' + m).checked);
   if (METRICS.length === 0) {
+    _drawEmptyChart(svg, 'No metric selected — pick at least one of SR / CM / MUE.');
     document.getElementById('frontier-bvg-meta').textContent =
       'No metric selected — pick at least one of SR / CM / MUE.';
+    return;
+  }
+
+  // Empty-data safeguard: every model in the list has null for every
+  // selected metric on both presets. Common cause: variant subset like
+  // {A} or {B} where SR / MUE are formally null.
+  const haveAnyValue = (d.models || []).some(m =>
+    METRICS.some(metric =>
+      (m.unified && m.unified[metric] != null) ||
+      (m.no_dist && m.no_dist[metric] != null)));
+  if (!haveAnyValue) {
+    _drawEmptyChart(svg,
+      `No ${METRICS.join(' / ')} values for variants: ${variantsLabel}`);
+    document.getElementById('frontier-bvg-meta').textContent =
+      `0 model × metric cells have a defined value under variants ${variantsLabel}. ` +
+      `(SR and MUE are null on no-constraint variants A and B; CM is defined everywhere.)`;
     return;
   }
 
@@ -3878,7 +3979,7 @@ async function drawBaselineVsGap() {
   const sortLabel = document.getElementById('bvg-sort').selectedOptions[0].textContent;
   document.getElementById('frontier-bvg-meta').textContent =
     `${d.models.length} models · sorted by ${sortLabel} · ` +
-    `metrics: ${METRICS.join(', ')} · ` +
+    `metrics: ${METRICS.join(', ')} · variants: ${variantsLabel} · ` +
     `bars = canon_unified, ★ = canon_no_distractor.`;
 }
 
@@ -3889,6 +3990,24 @@ async function drawBaselineVsGap() {
 });
 const bvgSortEl = document.getElementById('bvg-sort');
 if (bvgSortEl) bvgSortEl.addEventListener('change', drawBaselineVsGap);
+
+// Wire the variant checkboxes. Changing the selection refetches both
+// the bar-chart endpoint and the curves endpoint and redraws everything
+// in the Frontier tab. Includes a defensive guard against the user
+// unchecking every variant — that would make the server fall back to
+// its default and produce a confusing mismatch between UI and data,
+// so we re-check the box and skip the refresh.
+document.querySelectorAll('.frontier-var').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const anyChecked = Array.from(document.querySelectorAll('.frontier-var'))
+      .some(other => other.checked);
+    if (!anyChecked) {
+      cb.checked = true;   // restore so at least one stays selected
+      return;
+    }
+    refreshFrontier();
+  });
+});
 
 </script>
 

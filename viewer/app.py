@@ -3040,6 +3040,22 @@ def _stage_for_model(m: str) -> tuple[int, str]:
     return (9, "Other")
 
 
+_ALL_VARIANTS = ("C", "A+C", "B+C", "A", "B")
+_C_BEARING = ("C", "A+C", "B+C")
+
+
+def _parse_variants_arg(arg_str: str | None,
+                        default: tuple[str, ...] = _C_BEARING) -> set[str]:
+    """Parse a `?variants=C,A+C,B+C` query param into a validated set.
+    Falls back to `default` if the arg is empty or contains no valid
+    variants. Filters out anything not in {C, A+C, B+C, A, B}."""
+    if not arg_str:
+        return set(default)
+    parts = {p.strip() for p in arg_str.split(",") if p.strip()}
+    valid = parts & set(_ALL_VARIANTS)
+    return valid or set(default)
+
+
 @app.route("/api/frontier/baseline_vs_unified")
 def frontier_baseline_vs_unified():
     """Per-model SR/CM/MUE on canon_unified (bars) and canon_no_distractor
@@ -3049,11 +3065,16 @@ def frontier_baseline_vs_unified():
     Excludes ERROR rows and parse_error rows. Computes a clean SR%, CM%,
     MUE% per (model, preset) using the same conventions as the rest of
     the viewer.
+
+    The optional `?variants=C,A+C,B+C` query param restricts the rows
+    used in the metric calculations to the given subset. Default is
+    C-bearing only (C / A+C / B+C), matching the paper's headline
+    convention. Note: SR and MUE are formally null for no-constraint
+    variants A and B (no constraint to flag), so a selection that
+    includes A or B will yield smaller denominators for those metrics
+    than for CM (which is defined on every row).
     """
-    # Per-metric valid_variants (matches STAT_DEFS used by the Charts tab)
-    SR_VARIANTS = {"C", "A+C", "B+C"}
-    CM_VARIANTS = {"C", "A+C", "B+C", "A", "B"}
-    MUE_VARIANTS = {"C", "A+C", "B+C"}
+    variants = _parse_variants_arg(request.args.get("variants"))
 
     out: list[dict] = []
     for entry in _list_models():
@@ -3062,17 +3083,20 @@ def frontier_baseline_vs_unified():
         rows = [r for r in rows if not r["_is_error"]]
         if not rows: continue
 
-        # canon_unified (bars) — scenario-macro-averaged within each
-        # metric's valid_variants subset. Matches Charts tab convention.
-        sr_rows  = [r for r in rows if r.get("evidence_variant") in SR_VARIANTS]
-        cm_rows  = [r for r in rows if r.get("evidence_variant") in CM_VARIANTS]
-        mue_rows = [r for r in rows if r.get("evidence_variant") in MUE_VARIANTS]
-        sr_u  = _macro_avg_pct(sr_rows,  "_vigilance", "_vig_set")
-        cm_u  = _macro_avg_pct(cm_rows,  "_cm",        "_cm_set")
-        mue_u = _macro_avg_pct(mue_rows, "_mue",       "_mue_set")
+        # canon_unified (bars) — restrict to selected variants, then
+        # macro-average within each metric. Each metric's _set field
+        # ("_vig_set", "_cm_set", "_mue_set") already encodes whether
+        # the metric is defined for that row (e.g. _vig_set is False
+        # for A and B variants), so the filter just narrows the row
+        # population further.
+        v_rows = [r for r in rows if r.get("evidence_variant") in variants]
+        sr_u  = _macro_avg_pct(v_rows, "_vigilance", "_vig_set")
+        cm_u  = _macro_avg_pct(v_rows, "_cm",        "_cm_set")
+        mue_u = _macro_avg_pct(v_rows, "_mue",       "_mue_set")
 
-        # canon_no_distractor (markers) — same macro-average treatment.
-        # Need to first hydrate boolean fields the way _load_run does.
+        # canon_no_distractor (markers) — same treatment, but rows from
+        # the no-distractor preset need their boolean fields hydrated
+        # the way _load_run does.
         nd_rows_raw = _load_no_dist_run(m) or []
         nd_rows_raw = [r for r in nd_rows_raw
                        if not (r.get("raw_response","") or "").startswith(("ERROR", '"ERROR'))]
@@ -3089,17 +3113,15 @@ def frontier_baseline_vs_unified():
                 mue = (r.get("mentions_user_evidence") or "").strip().upper()
                 r.setdefault("_mue_set", mue in ("YES", "NO"))
                 r.setdefault("_mue", mue == "YES")
-            sr_nd_rows  = [r for r in nd_rows_raw if r.get("evidence_variant") in SR_VARIANTS]
-            cm_nd_rows  = [r for r in nd_rows_raw if r.get("evidence_variant") in CM_VARIANTS]
-            mue_nd_rows = [r for r in nd_rows_raw if r.get("evidence_variant") in MUE_VARIANTS]
-            sr_nd  = _macro_avg_pct(sr_nd_rows,  "_vigilance", "_vig_set")
-            cm_nd  = _macro_avg_pct(cm_nd_rows,  "_cm",        "_cm_set")
-            mue_nd = _macro_avg_pct(mue_nd_rows, "_mue",       "_mue_set")
-            n_nd = len(nd_rows_raw)
+            v_nd_rows = [r for r in nd_rows_raw if r.get("evidence_variant") in variants]
+            sr_nd  = _macro_avg_pct(v_nd_rows, "_vigilance", "_vig_set")
+            cm_nd  = _macro_avg_pct(v_nd_rows, "_cm",        "_cm_set")
+            mue_nd = _macro_avg_pct(v_nd_rows, "_mue",       "_mue_set")
+            n_nd = len(v_nd_rows)
         else:
             sr_nd = cm_nd = mue_nd = None
             n_nd = 0
-        n_u = len(rows)
+        n_u = len(v_rows)
 
         stage_order, stage_label = _stage_for_model(m)
         out.append({
@@ -3118,7 +3140,10 @@ def frontier_baseline_vs_unified():
                     d[k] = round(v, 2)
     # Sort: stage order, then unified SR descending (None values last)
     out.sort(key=lambda r: (r["stage_order"], -(r["unified"]["SR"] or -1)))
-    return jsonify({"models": out})
+    return jsonify({
+        "models": out,
+        "variants": sorted(variants, key=lambda v: _ALL_VARIANTS.index(v)),
+    })
 
 
 @app.route("/api/frontier/data")
@@ -3126,17 +3151,27 @@ def frontier_data():
     """For each model with canon_unified data, compute the binned
     SR(length) curve (averaged over depth) and SR(depth) curve
     (averaged over length). The frontend overlays these against an
-    SR threshold to surface where each model crosses below it."""
+    SR threshold to surface where each model crosses below it.
+
+    Accepts the same `?variants=` filter as `/baseline_vs_unified`.
+    Default is C-bearing only (C / A+C / B+C); selecting A or B will
+    typically produce empty curves because SR is null on no-constraint
+    variants (`_vig_set=False`)."""
     threshold = float(request.args.get("threshold", "80"))
     n_len = max(2, int(request.args.get("n_len", "10")))
     n_dep = max(2, int(request.args.get("n_dep", "10")))
+    variants = _parse_variants_arg(request.args.get("variants"))
     import math
-    out = {"threshold": threshold, "models": []}
+    out = {
+        "threshold": threshold,
+        "variants": sorted(variants, key=lambda v: _ALL_VARIANTS.index(v)),
+        "models": [],
+    }
     for entry in _list_models():
         m = entry["model"]; run_id = entry["latest_run_id"]
         rows = _load_run(m, run_id).get("rows", [])
         rows = [r for r in rows
-                if "C" in (r.get("evidence_variant") or "")
+                if r.get("evidence_variant") in variants
                 and r.get("char_budget") and r.get("placement_frac") is not None
                 and r["_vig_set"]]
         if not rows:
