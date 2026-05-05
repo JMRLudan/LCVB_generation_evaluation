@@ -176,21 +176,21 @@ async def openrouter_chat(
     `temperature` defaults to module-level TEMPERATURE (1.0) when None,
     so callers can override per-condition (e.g., distractor uses 0.3).
 
-    `max_tokens` defaults to 30000 (raised 2026-05-04 from 10000 after
-    Stage-6 qwen3.5-9b smoke showed a bimodal completion-token
-    distribution with a 14–26% spike at the cap — the long thinking tail
-    of reasoning-capable models needs more headroom than 10K). Pay-per-
-    token billing means we only pay for what's emitted, so a generous
-    ceiling is free.
+    `max_tokens` defaults to 30000 (raised from the earlier 10000 after
+    a smoke run on a reasoning-capable open-source model showed a
+    bimodal completion-token distribution with a 14–26% spike at the
+    cap — the long thinking tail needs more headroom than 10K).
+    Pay-per-token billing means we only pay for what's emitted, so a
+    generous ceiling is free.
 
     `reasoning_mode`:
       - "default": no reasoning param sent — the model uses whatever
-        thinking behavior the provider ships as default. Stage-6 default
-        per `feedback_system_defaults_reasoning` memory.
+        thinking behavior the provider ships as default. Recommended
+        for canon runs.
       - "off": send `reasoning={"enabled": False}` to suppress thinking.
         Used only for explicit reasoning-on-vs-off ablations.
       - "low": legacy alias for the THINKING_MODELS effort=low override
-        used by Stage-3/4/5; preserved for reproducibility of past runs.
+        kept for back-compat reproducibility of earlier runs.
     """
     messages = [
         {"role": "system", "content": system_prompt},
@@ -203,8 +203,9 @@ async def openrouter_chat(
     if reasoning_mode == "off":
         model_params["reasoning"] = {"enabled": False}
     elif reasoning_mode == "low" or (reasoning_mode == "default" and model in THINKING_MODELS):
-        # Legacy path: Stage-3/4/5 used effort=low for THINKING_MODELS.
-        # Kept default-on for those slugs to preserve historical behavior.
+        # Legacy path: earlier OpenAI/Gemini runs used effort=low for
+        # THINKING_MODELS. Kept default-on for those slugs to preserve
+        # historical behavior.
         model_params["reasoning"] = {"effort": "low"}
     # else "default" with model not in THINKING_MODELS → no reasoning param
 

@@ -45,7 +45,7 @@ Each invocation runs all 3 presets (canon_direct, canon_no_distractor,
 canon_unified) in parallel, judges each row inline with Haiku 4.5
 with-analysis, and prints a per-model card on completion.
 
-## Reproduce the Stage-6 ladder + ablation
+## Reproduce the open-source roster + ablation
 
 ```bash
 # Qwen no-thinking ladder (5-point scaling curve)
@@ -66,7 +66,7 @@ done
 For exact inference parameters per model (temperature, max_tokens,
 reasoning settings), see `INFERENCE.md` at repo root.
 
-## Reproduce the frontier roster (Stages 2–4)
+## Reproduce the frontier roster (Anthropic / OpenAI / Google)
 
 These were originally launched via batch APIs for cost. The
 `run_canon.sh` real-time path produces identical output rows; choose
@@ -128,7 +128,7 @@ grouped by stage.
 - Building the canon prompt set. See `pipeline/renderers/` and
   `DESIGN.md`. The repo ships pre-rendered prompts in `generated/`;
   re-render only if you change the scenarios or the distractor pool.
-- Batch-API submission. The original Stages 2–5 used
+- Batch-API submission. The original frontier and XL runs used
   `pipeline/batch_runner.py` directly against the Anthropic, OpenAI,
   and Gemini Batch APIs (50% pricing). The real-time path documented
   here produces output rows with the same schema. See

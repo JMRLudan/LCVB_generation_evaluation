@@ -14,7 +14,7 @@ Scenarios are tested under five evidence variants:
 ## Judge Extraction Fields
 
 A lightweight classifier (Haiku 4.5) reads the model's response and extracts five fields
-in the canonical `with_analysis` mode used for all Stage 1–6 runs:
+in the canonical `with_analysis` mode used across the full model roster:
 
 | Field | Values | Meaning |
 |---|---|---|

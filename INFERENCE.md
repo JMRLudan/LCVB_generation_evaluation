@@ -17,7 +17,7 @@ summarizes the unique settings observed across every canon row.
 
 ## Subject inference
 
-### Stage 2 — Anthropic frontier
+### Anthropic frontier (Sonnet 4.6, Opus 4.7)
 | Model slug | Native API | temperature | max_tokens | extended_thinking | Notes |
 |---|---|---|---|---|---|
 | `anthropic/claude-sonnet-4.6` | Anthropic Messages | 1.0 | 10000 | OFF (system default; not opted in) | Submitted via Messages Batches API at 50% off. |
@@ -28,7 +28,7 @@ the *system default* used by claude.ai when no temperature is provided.
 Extended thinking is disabled by default in the Messages API; we did
 not pass `thinking={"type": "enabled", ...}`.
 
-### Stage 3 — OpenAI GPT-5 family
+### OpenAI GPT-5 family
 | Model slug | Native API | temperature | max_completion_tokens | reasoning effort | Notes |
 |---|---|---|---|---|---|
 | `openai/gpt-5-mini` | OpenAI Responses (`/v1/responses`) | 1.0 | 10000 | medium (system default) | GPT-5 family rejects `temperature ≠ 1.0`. Submitted via Batch API at 50% off. |
@@ -40,7 +40,7 @@ model uses its default reasoning effort. The `max_completion_tokens`
 is the GPT-5-specific replacement for `max_tokens` (the older field
 is rejected by GPT-5 endpoints).
 
-### Stage 4 — Google Gemini 3.x
+### Google Gemini 3.x
 | Model slug | Native API | temperature | maxOutputTokens | thinking | Notes |
 |---|---|---|---|---|---|
 | `google/gemini-3-flash-preview` | Google AI / Files Batch | 1.0 | 10000 | ON (system default) | `thoughtsTokenCount` is summed into `output_tokens` for billing. Submitted via Batch mode at 50% off. |
@@ -51,7 +51,7 @@ Gemini 3.x thinking is on by default; we pass no thinking-related
 parameter. Output token counting includes both visible content
 (`candidatesTokenCount`) and reasoning (`thoughtsTokenCount`).
 
-### Stage 6 — Open-source (via OpenRouter)
+### Open-source roster (via OpenRouter)
 
 #### Qwen3.5 ladder (no-thinking)
 All five Qwen3.5 ladder models ran with thinking explicitly disabled

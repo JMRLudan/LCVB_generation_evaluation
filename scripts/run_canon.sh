@@ -16,12 +16,12 @@
 #                  openai/gpt-oss-120b, deepseek/deepseek-v4-pro
 #   --reasoning    default | off | low
 #                  - default = no override; the model uses its
-#                    system-default thinking behavior (matches the
-#                    paper's headline runs)
-#                  - off     = inject reasoning.enabled=false (Stage-6
-#                    "no thinking" ladder)
-#                  - low     = legacy reasoning.effort=low (Stage-3/4
-#                    parity)
+#                    system-default thinking behavior (the setting
+#                    used for the canon runs of frontier models)
+#                  - off     = inject reasoning.enabled=false (used by
+#                    the no-thinking Qwen ladder)
+#                  - low     = legacy reasoning.effort=low (kept for
+#                    back-compat with earlier OpenAI/Gemini runs)
 #   --model-tag    optional suffix appended to the on-disk dir name
 #                  (NOT to the API call). Used to keep multiple runs
 #                  of the same model under separate viewer dirs (e.g.

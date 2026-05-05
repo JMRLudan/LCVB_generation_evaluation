@@ -64,8 +64,8 @@ python3 viewer/app.py
 The viewer's Frontier tab includes a "Baseline vs vigilance" chart
 that places every model in the roster as bars (canon_unified
 SR/CM/MUE) alongside stars (canon_no_distractor SR/CM/MUE), grouped
-by launch stage. The chart can be sorted by vigilance gap, overall
-SR, or model name.
+by vendor / model family. The chart can be sorted by vigilance gap,
+overall SR, or model name.
 
 ### 2. Re-run a model
 
@@ -85,8 +85,9 @@ bash scripts/run_canon.sh --model deepseek/deepseek-v4-pro
 bash scripts/status.sh --loop
 ```
 
-For the full Stage-6 reproduction recipe (the no-thinking ladder + the
-9b reasoning ablation + the 3 comparators), see [`scripts/README.md`](scripts/README.md).
+For the full open-source-roster reproduction recipe (the no-thinking
+Qwen3.5 ladder + the 9b reasoning ablation + the GPT-OSS / DeepSeek
+comparators), see [`scripts/README.md`](scripts/README.md).
 
 For exact inference parameters per model, see [`INFERENCE.md`](INFERENCE.md).
 
@@ -116,23 +117,23 @@ See [`DESIGN.md`](DESIGN.md) for the canon construction and
 
 ## Per-model results (illustrative)
 
-The values below are a snapshot of the canonical Stage 1–6 runs
-(scenario-macro-averaged). The viewer's Frontier tab is the
+The values below are a snapshot of the canonical runs across the full
+roster (scenario-macro-averaged). The viewer's Frontier tab is the
 authoritative source and updates as runs are re-judged or extended.
 
-| Stage | Model | SR direct | SR no-dist | SR unified | Gap |
+| Vendor / family | Model | SR direct | SR no-dist | SR unified | Gap |
 |---|---|---|---|---|---|
-| 1 | claude-haiku-4-5 | (archived) | 54.2 | 28.4 | n/a |
-| 2 | claude-sonnet-4.6 | 97.9 | 64.0 | 67.6 | +30 |
-| 2 | claude-opus-4.7 | 97.6 | 70.3 | 81.8 | +16 |
-| 3 | gpt-5 | 98.4 | 73.3 | 91.8 | +7 |
-| 3 | gpt-5.5 | 99.1 | 74.1 | 90.5 | +9 |
-| 4 | gemini-3-flash | 98.2 | 74.3 | 92.6 | +6 |
-| 4 | gemini-3.1-pro | 98.4 | 72.7 | 91.4 | +7 |
-| 6 | qwen3.5-397b-a17b (off) | 98.6 | 84.3 | 61.1 | +37 |
-| 6 | gpt-oss-120b | 96.7 | 75.1 | 40.5 | +56 |
-| 6 | gpt-oss-20b | 96.1 | 56.5 | 19.9 | +76 |
-| 6 | deepseek-v4-pro | 97.4 | 88.4 | 63.1 | +34 |
+| Anthropic | claude-haiku-4-5 | (archived) | 54.2 | 28.4 | n/a |
+| Anthropic | claude-sonnet-4.6 | 97.9 | 64.0 | 67.6 | +30 |
+| Anthropic | claude-opus-4.7 | 97.6 | 70.3 | 81.8 | +16 |
+| OpenAI | gpt-5 | 98.4 | 73.3 | 91.8 | +7 |
+| OpenAI | gpt-5.5 | 99.1 | 74.1 | 90.5 | +9 |
+| Google | gemini-3-flash | 98.2 | 74.3 | 92.6 | +6 |
+| Google | gemini-3.1-pro | 98.4 | 72.7 | 91.4 | +7 |
+| Open-source | qwen3.5-397b-a17b (off) | 98.6 | 84.3 | 61.1 | +37 |
+| Open-source | gpt-oss-120b | 96.7 | 75.1 | 40.5 | +56 |
+| Open-source | gpt-oss-20b | 96.1 | 56.5 | 19.9 | +76 |
+| Open-source | deepseek-v4-pro | 97.4 | 88.4 | 63.1 | +34 |
 
 Across this roster, canon_direct SR clusters in the 96–99% band while
 canon_unified SR ranges from roughly 19% to 93%. The per-model gap

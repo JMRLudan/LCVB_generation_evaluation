@@ -93,8 +93,8 @@ ANTHROPIC_TO_OR_PRICING_DEFAULT: dict[str, str] = {
     "claude-sonnet-4-5":           "anthropic/claude-sonnet-4.5",
     "claude-sonnet-4-5-20250929":  "anthropic/claude-sonnet-4.5",
     "claude-sonnet-4-5-20250514":  "anthropic/claude-sonnet-4.5",  # legacy alias
-    # 2026-05-01: Stage-2 frontier roster. Aliases resolve to current
-    # versions on the API; OR pricing slugs are kept up to date.
+    # Anthropic frontier roster. Aliases resolve to current versions on
+    # the API; OR pricing slugs are kept up to date.
     "claude-sonnet-4-6":           "anthropic/claude-sonnet-4.6",
     "claude-opus-4-6":             "anthropic/claude-opus-4.6",
     "claude-opus-4-7":             "anthropic/claude-opus-4.7",

@@ -58,11 +58,9 @@ RUNS_DIR = BASE_DIR / "data" / "runs"
 # regression checks and for reproducing per-scenario judge verdicts. Override
 # via --temperature if a stochastic eval is wanted (e.g. measuring response
 # variance for a single prompt).
-DEFAULT_TEMPERATURE = 1.0   # 2026-05-04: aligned with batch_runner + multi_model_runner
-                            # (Stage-2/3/4/5 batch runs all used T=1.0; the 0.0 default
-                            # here was an inconsistency that put today's qwen3.5-9b smoke
-                            # off the rest of the canon. The judge uses its own
-                            # eval_pipeline.TEMPERATURE = 0.0 unaffected by this change.)
+DEFAULT_TEMPERATURE = 1.0   # Aligned with batch_runner + multi_model_runner; every
+                            # canon-era subject run used T=1.0. The judge uses its own
+                            # eval_pipeline.TEMPERATURE = 0.0 unaffected by this default.
 
 
 def load_items_from_dir(prompts_dir: Path) -> List[EvalItem]:
@@ -412,8 +410,8 @@ def main():
     ap.add_argument(
         "--max-tokens", type=int, default=30000,
         help="Max output tokens per call (default 30000). Pass smaller "
-             "to enforce a tighter cap (e.g. 10000 to reproduce the "
-             "Stage-2/3/4 cap regime).",
+             "to reproduce a tighter cap (e.g. 10000 to match the "
+             "frontier-roster runs).",
     )
     ap.add_argument(
         "--reasoning",
@@ -421,11 +419,11 @@ def main():
         default="default",
         help=(
             "Reasoning/thinking mode for OpenRouter-routed models. "
-            "'default' (recommended for headline runs) sends no reasoning "
-            "param so the model uses its system default. 'off' injects "
-            "reasoning={'enabled': False} to suppress thinking — used "
-            "only for explicit ablations. 'low' is the legacy "
-            "effort=low override used in Stage-3/4/5."
+            "'default' is the recommended setting for canon runs and "
+            "sends no reasoning param so the model uses its system "
+            "default. 'off' injects reasoning={'enabled': False} to "
+            "suppress thinking — used only for explicit ablations. "
+            "'low' is a legacy effort=low override kept for back-compat."
         ),
     )
     ap.add_argument(

@@ -70,13 +70,12 @@ change:
    preset uses ~30 % fewer total tokens at higher per-scenario
    coverage.
 
-A `canon_fixed_grid` condition (5 fixed depths × 3 haystacks) was part
-of an earlier iteration of the canon and remains callable through
-`render_fixed_locations.py` if needed for ablations, but is not part of
-the current canon. The previous three-tier
-`canon_uniform_short/medium/long` presets are similarly retired —
-representable via `length_mode="fixed"` with the historical
-`lengths_named` values if back-compat replication is needed.
+Earlier iterations of the canon used a fixed-grid condition (5 fixed
+depths × 3 haystacks) and a three-tier `canon_uniform_short/medium/long`
+preset. Both have been retired in favor of the unified preset and are
+no longer wired into the codebase. They can be reproduced by calling
+`mixer.mix()` directly with the appropriate fixed-mode parameters if a
+back-compat replication is needed.
 
 Any new condition — ablations, rebuttal experiments, robustness checks —
 is defined the same way: specify the point in the hypercube, call

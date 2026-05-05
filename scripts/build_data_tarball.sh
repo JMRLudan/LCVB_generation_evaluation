@@ -137,8 +137,9 @@ cp /tmp/INTEGRITY.json "${STAGING}/INTEGRITY.json"
 cat > "${STAGING}/README.md" <<EOF
 # LCVB data archive ${VERSION}
 
-This tarball contains the canonical Stage 1–6 LCVB results and the rendered
-prompt sets used to produce them. Extracted in-place over a clone of
+This tarball contains the canonical LCVB results across the full
+model roster, plus the rendered prompt sets used to produce them.
+Extracted in-place over a clone of
 \`JMRLudan/LCVB_generation_evaluation\`, it provides:
 
 - \`data/runs/canon_<preset>/<model>/<run_id>/results.tsv\` — per-row judged outputs

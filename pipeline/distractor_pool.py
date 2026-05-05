@@ -32,8 +32,9 @@ every renderer in this repo MUST satisfy:
     len(all_hashes))` and scenario `scenarios_sorted[i]` is assigned
     `permutation[i]`.
 
-The multi-distractor "stitched" harder variant is implemented elsewhere
-(`renderers/render_stitched_locations.py`) and is NOT the default.
+Multi-distractor stitching (used by `canon_unified`) is implemented in
+`renderers/mixer.py` via `n_distractors_per_prompt` and the assembly
+helpers in `renderers/assembly.py`.
 """
 
 from __future__ import annotations

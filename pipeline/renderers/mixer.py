@@ -77,13 +77,6 @@ Canonical wrappers
         length_mode="log_uniform_stratified",
         length_range=(3000, 250000),
         c_only=False)``
-* ``render_fixed_locations``  →
-  ``mix(n_d=1, n_p=5, n_l=2, placement_mode="fixed",
-        placements_list=(0, .25, .5, .75, 1),
-        lengths_named={"short": 24000, "long": 224000})``  (non-canon, ablation)
-* ``render_continuous_random`` →
-  ``mix(n_d=1, n_p=1, n_l=1, placement_mode="uniform",
-        lengths_named={"long": 224000})``  (non-canon, ablation)
 
 The wrappers live in their respective ``render_*.py`` files and exist
 purely so the CLI presets and viewer knobs stay familiar. Any

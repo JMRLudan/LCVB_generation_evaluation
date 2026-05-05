@@ -254,8 +254,8 @@ def _load_run(model: str, run_id: str, preset: str = CONDITION) -> dict:
             perm_raw = r.get("permutation", "")
             md = pm.get((sid, r.get("evidence_variant", ""), perm_raw), {})
             if not md and "-d" not in perm_raw:
-                # Fallback: results from `run.py` (Stage-6 qwen smoke) wrote
-                # the BARE permutation (`c0_a0`) instead of the suffixed
+                # Fallback: an early run.py code path wrote the BARE
+                # permutation (`c0_a0`) instead of the suffixed
                 # form (`c0_a0-d0-l0`). For canon_unified, the 3 draw
                 # variants share the base perm, so we can't pick the exact
                 # resample. Use the first matching draw_idx=0 / length_idx=0
@@ -374,11 +374,11 @@ def _load_no_dist_run(model: str) -> list[dict] | None:
     """Read the latest canon_no_distractor results.tsv for this model.
 
     Looks in two places, in order:
-      1. ``data/runs/canon_no_distractor/<model>/...``  (live; Sonnet 4.6
-         and Opus 4.7 land here from the Stage-2 sweep)
+      1. ``data/runs/canon_no_distractor/<model>/...``  (the standard
+         live location; the Anthropic frontier runs land here)
       2. ``data/archive_canon_no_distractor_*/runs/<model>/...``
-         (archived after the 2026-05-01 unified-only refactor;
-         Haiku 4.5 lives here)
+         (archived after the 2026-05-01 unified-only refactor; some
+         older Haiku runs were archived here before the round-2 backfill)
     """
     if model in _NO_DIST_CACHE:
         return _NO_DIST_CACHE[model]
@@ -3027,22 +3027,24 @@ def surface_data():
 # Frontier (overlay of per-model SR-threshold contours)
 # ──────────────────────────────────────────────────────────────────────
 def _stage_for_model(m: str) -> tuple[int, str]:
-    """Bucket a model dir name into (stage_order, stage_label) for grouping
-    in cross-model views. Stages match the canon's launch chronology."""
+    """Bucket a model dir name into (sort_order, group_label) for grouping
+    in cross-model views. Order follows the canonical roster's listing
+    so the Frontier chart's per-vendor groups read in a consistent
+    direction across reloads. Function name is kept for API stability."""
     ml = m.lower()
-    if "haiku" in ml:                       return (1, "Stage 1 — Haiku canon")
-    if "sonnet" in ml or "opus" in ml:      return (2, "Stage 2 — Anthropic frontier")
-    if "gpt-5" in ml or "openai" in ml:     return (3, "Stage 3 — OpenAI")
-    if "gemini" in ml or "google" in ml:    return (4, "Stage 4 — Gemini")
-    if "qwen" in ml:                        return (6, "Stage 6 — Qwen open-source")
+    if "haiku" in ml:                       return (1, "Anthropic Haiku")
+    if "sonnet" in ml or "opus" in ml:      return (2, "Anthropic frontier")
+    if "gpt-5" in ml or "openai" in ml:     return (3, "OpenAI")
+    if "gemini" in ml or "google" in ml:    return (4, "Google Gemini")
+    if "qwen" in ml:                        return (6, "Open-source — Qwen")
     return (9, "Other")
 
 
 @app.route("/api/frontier/baseline_vs_unified")
 def frontier_baseline_vs_unified():
     """Per-model SR/CM/MUE on canon_unified (bars) and canon_no_distractor
-    (markers/stars), grouped by stage, for the Frontier tab's
-    baseline-vs-vigilance grouped-bar chart.
+    (markers/stars), grouped by vendor / model family, for the Frontier
+    tab's baseline-vs-vigilance grouped-bar chart.
 
     Excludes ERROR rows and parse_error rows. Computes a clean SR%, CM%,
     MUE% per (model, preset) using the same conventions as the rest of
